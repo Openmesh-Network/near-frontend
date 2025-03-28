@@ -1,5 +1,5 @@
 {
-  description = "Nextjs app running on Xnode!";
+  description = "Easily deploy NEAR validators using Xnode.";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs?ref=nixos-unstable";

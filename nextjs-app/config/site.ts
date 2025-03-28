@@ -1,6 +1,7 @@
-export type SiteConfig = typeof siteConfig
+export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: "Xnode Nextjs Template",
-  description: "Template to make your Nextjs app Xnode/Nix compatible.",
-} as const
+  name: "NEAR Studio",
+  description: "Easily deploy NEAR validators using Xnode.",
+  url: "https://near.xnode.openmesh.network",
+} as const;

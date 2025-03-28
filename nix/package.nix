@@ -1,6 +1,6 @@
 { pkgs, lib }:
 pkgs.buildNpmPackage {
-  pname = "xnode-nextjs-template";
+  pname = "near-frontend";
   version = "1.0.0";
   src = ../nextjs-app;
 
@@ -34,7 +34,7 @@ pkgs.buildNpmPackage {
     chmod +x $out/share/homepage/server.js
 
     # we set a default port to support "nix run ..."
-    makeWrapper $out/share/homepage/server.js $out/bin/xnode-nextjs-template \
+    makeWrapper $out/share/homepage/server.js $out/bin/near-frontend \
       --set-default PORT 3000 \
       --set-default HOSTNAME 0.0.0.0
 
@@ -44,6 +44,6 @@ pkgs.buildNpmPackage {
   doDist = false;
 
   meta = {
-    mainProgram = "xnode-nextjs-template";
+    mainProgram = "near-frontend";
   };
 }
