@@ -33,6 +33,7 @@ import { AccountView, CodeResult } from "near-api-js/lib/providers/provider";
 import { ScrollArea } from "../ui/scroll-area";
 import { formatUnits, parseUnits } from "viem";
 import { Ansi } from "../ansi";
+import axios from "axios";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
   const { xnodes } = useSettings();
@@ -146,7 +147,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const { accountId, modal, selector, loading } = useNear();
   const fullPoolId = `${poolId}.${poolVersion}.near`;
   const { data: poolDeployed } = useQuery({
-    queryKey: [near ?? "", fullPoolId],
+    queryKey: ["poolDeployed", near ?? "", fullPoolId],
     enabled: !!near && !fullPoolId.startsWith("."),
     queryFn: async () => {
       if (!near) {
@@ -166,7 +167,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     },
   });
   const { data: connectedAccountBalance } = useQuery({
-    queryKey: [near ?? "", accountId ?? ""],
+    queryKey: ["connectedAccountBalance", near ?? "", accountId ?? ""],
     enabled: !!near && !!accountId,
     queryFn: async () => {
       if (!near || !accountId) {
@@ -198,43 +199,73 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
 
     return { poolCost, gasFee };
   }, [poolVersion]);
-  const { data: deployedPoolSettings } = useQuery({
-    queryKey: [near ?? "", poolDeployed ?? false, fullPoolId],
+  const { data: deployedPoolSettings, refetch: refetchDeployedPoolSettings } =
+    useQuery({
+      queryKey: [
+        "deployedPoolSettings",
+        near ?? "",
+        poolDeployed ?? false,
+        fullPoolId,
+      ],
+      enabled: !!near && poolDeployed,
+      queryFn: async () => {
+        if (!near) {
+          return undefined;
+        }
+
+        const responses = await Promise.all(
+          ["get_owner_id", "get_staking_key", "get_reward_fee_fraction"].map(
+            (method_name) =>
+              near.connection.provider.query<CodeResult>({
+                request_type: "call_function",
+                finality: "final",
+                account_id: fullPoolId,
+                method_name,
+                args_base64: "",
+              })
+          )
+        );
+        return {
+          owner_id: String.fromCharCode(...responses[0].result).replaceAll(
+            '"',
+            ""
+          ),
+          stake_public_key: String.fromCharCode(
+            ...responses[1].result
+          ).replaceAll('"', ""),
+          reward_fee_fraction: JSON.parse(
+            String.fromCharCode(...responses[2].result)
+          ),
+        };
+      },
+    });
+  const { data: totalPoolStake, refetch: refetchTotalPoolStake } = useQuery({
+    queryKey: ["totalPoolStake", near ?? "", poolDeployed ?? false, fullPoolId],
     enabled: !!near && poolDeployed,
     queryFn: async () => {
       if (!near) {
         return undefined;
       }
 
-      const responses = await Promise.all(
-        ["get_owner_id", "get_staking_key", "get_reward_fee_fraction"].map(
-          (method_name) =>
-            near.connection.provider.query<CodeResult>({
-              request_type: "call_function",
-              finality: "final",
-              account_id: fullPoolId,
-              method_name,
-              args_base64: "",
-            })
+      const response = await near.connection.provider.query<CodeResult>({
+        request_type: "call_function",
+        finality: "final",
+        account_id: fullPoolId,
+        method_name: "get_total_staked_balance",
+        args_base64: "",
+      });
+      return parseFloat(
+        formatUnits(
+          BigInt(String.fromCharCode(...response.result).replaceAll('"', "")),
+          24
         )
       );
-      return {
-        owner_id: String.fromCharCode(...responses[0].result).replaceAll(
-          '"',
-          ""
-        ),
-        stake_public_key: String.fromCharCode(
-          ...responses[1].result
-        ).replaceAll('"', ""),
-        reward_fee_fraction: JSON.parse(
-          String.fromCharCode(...responses[2].result)
-        ),
-      };
     },
   });
 
   const { data: pingerAccountBalance } = useQuery({
     queryKey: [
+      "pingerAccountBalance",
       near ?? "",
       existingNearContainerSettings?.pinger ?? false,
       pingerAccountId ?? "",
@@ -263,6 +294,56 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     },
   });
   const [pingerTopUp, setPingerTopUp] = useState<string>("0");
+
+  const { data: validatorStats } = useQuery({
+    queryKey: ["validatorStats", near ?? ""],
+    enabled: !!near,
+    queryFn: async () => {
+      if (!near) {
+        return undefined;
+      }
+
+      const stats = await axios
+        .post(
+          "https://rpc.mainnet.near.org/",
+          {
+            jsonrpc: "2.0",
+            method: "validators",
+            id: "dontcare",
+            params: [null],
+          },
+          {
+            responseType: "json",
+          }
+        )
+        .then((res) => res.data)
+        .then(
+          (data) =>
+            data.result as {
+              current_validators: {
+                account_id: string;
+                num_expected_blocks: number;
+                num_expected_chunks: number;
+                num_expected_endorsements: number;
+                num_produced_blocks: number;
+                num_produced_chunks: number;
+                num_produced_endorsements: number;
+              }[];
+            }
+        );
+      return stats;
+    },
+  });
+  const myValidatorStats = useMemo(() => {
+    if (!validatorStats) {
+      return undefined;
+    }
+
+    return validatorStats.current_validators.find(
+      (v) => v.account_id === fullPoolId
+    );
+  }, [fullPoolId, validatorStats]);
+  const [stakeTopUp, setStakeTopUp] = useState<string>("0");
 
   return (
     <div className="mt-2 flex flex-col gap-5">
@@ -463,7 +544,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           <div className="flex flex-col gap-1">
             <div className="text-sm">
               {accountId ? (
-                <div>
+                <div className="overflow-x-auto">
                   <Button
                     className="px-2 py-0.5 h-auto"
                     onClick={() =>
@@ -473,9 +554,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         .catch(console.error)
                     }
                   >
-                    Disconnect {accountId}
+                    Disconnect <span className="break-words">{accountId}</span>
                     {connectedAccountBalance
-                      ? ` (${connectedAccountBalance} NEAR)`
+                      ? ` (${connectedAccountBalance.toFixed(3)} NEAR)`
                       : ""}
                   </Button>
                 </div>
@@ -490,124 +571,84 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 </div>
               )}
             </div>
-            {
-              <div className="flex flex-col gap-3">
-                {poolDeployed !== undefined &&
-                  (!poolDeployed ? (
-                    connectedAccountBalance !== undefined &&
-                    connectedAccountBalance <
-                      requiredAccountBalance.poolCost +
-                        requiredAccountBalance.gasFee ? (
-                      <div className="flex items-center gap-1">
-                        <TriangleAlert className="text-red-600" />
-                        <span className="text-red-600">
-                          Pool not deployed. Connected account does not have{" "}
-                          {requiredAccountBalance.poolCost} NEAR (+ {"<"}
-                          {requiredAccountBalance.gasFee} in gas fees) required
-                          to deploy one.
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1">
-                        <TriangleAlert className="text-red-600" />
-                        <span className="text-red-600">Pool not deployed.</span>
-                        <Button
-                          onClick={() => {
-                            selector
-                              .wallet()
-                              .then((w) =>
-                                w.signAndSendTransaction({
-                                  receiverId: `${poolVersion}.near`,
-                                  actions: [
-                                    {
-                                      type: "FunctionCall",
-                                      params: {
-                                        methodName: "create_staking_pool",
-                                        args: {
-                                          staking_pool_id: poolId,
-                                          owner_id: accountId,
-                                          stake_public_key: validatorPublicKey,
-                                          reward_fee_fraction: {
-                                            numerator: rewardFee,
-                                            denominator: 100,
-                                          },
-                                          code_hash:
-                                            poolVersion === "pool"
-                                              ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
-                                              : undefined,
-                                        },
-                                        deposit:
-                                          requiredAccountBalance.poolCost.toString(),
-                                        gas: "300000000000000",
-                                      },
-                                    },
-                                  ],
-                                })
-                              )
-                              .catch(console.error);
-                          }}
-                        >
-                          Deploy
-                        </Button>
-                      </div>
-                    )
+            <div className="flex flex-col gap-3">
+              {poolDeployed !== undefined &&
+                (!poolDeployed ? (
+                  connectedAccountBalance !== undefined &&
+                  connectedAccountBalance <
+                    requiredAccountBalance.poolCost +
+                      requiredAccountBalance.gasFee ? (
+                    <div className="flex items-center gap-1">
+                      <TriangleAlert className="text-red-600" />
+                      <span className="text-red-600">
+                        Pool not deployed. Connected account does not have{" "}
+                        {requiredAccountBalance.poolCost} NEAR (+ {"<"}
+                        {requiredAccountBalance.gasFee} in gas fees) required to
+                        deploy one.
+                      </span>
+                    </div>
                   ) : (
                     <div className="flex items-center gap-1">
-                      <CheckCircle className="text-green-600" />
-                      <span className="text-green-600">Pool deployed.</span>
-                    </div>
-                  ))}
-                {poolDeployed !== undefined &&
-                  poolDeployed &&
-                  deployedPoolSettings &&
-                  (deployedPoolSettings.owner_id === accountId ? (
-                    <>
-                      {validatorPublicKey &&
-                        deployedPoolSettings.stake_public_key !==
-                          validatorPublicKey && (
-                          <div className="flex items-center gap-1">
-                            <TriangleAlert className="text-red-600" />
-                            <span className="text-red-600">
-                              Pool validator public key mismatch.
-                            </span>
-                            <Button
-                              onClick={() => {
-                                selector
-                                  .wallet()
-                                  .then((w) =>
-                                    w.signAndSendTransaction({
-                                      receiverId: fullPoolId,
-                                      actions: [
-                                        {
-                                          type: "FunctionCall",
-                                          params: {
-                                            methodName: "update_staking_key",
-                                            args: {
-                                              stake_public_key:
-                                                validatorPublicKey,
-                                            },
-                                            deposit: "0",
-                                            gas: "300000000000000",
-                                          },
+                      <TriangleAlert className="text-red-600" />
+                      <span className="text-red-600">Pool not deployed.</span>
+                      <Button
+                        onClick={() => {
+                          selector
+                            .wallet()
+                            .then((w) =>
+                              w.signAndSendTransaction({
+                                receiverId: `${poolVersion}.near`,
+                                actions: [
+                                  {
+                                    type: "FunctionCall",
+                                    params: {
+                                      methodName: "create_staking_pool",
+                                      args: {
+                                        staking_pool_id: poolId,
+                                        owner_id: accountId,
+                                        stake_public_key: validatorPublicKey,
+                                        reward_fee_fraction: {
+                                          numerator: rewardFee,
+                                          denominator: 100,
                                         },
-                                      ],
-                                    })
-                                  )
-                                  .catch(console.error);
-                              }}
-                            >
-                              Update
-                            </Button>
-                          </div>
-                        )}
-                      {(deployedPoolSettings.reward_fee_fraction.numerator !==
-                        rewardFee ||
-                        deployedPoolSettings.reward_fee_fraction.denominator !==
-                          100) && (
+                                        code_hash:
+                                          poolVersion === "pool"
+                                            ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
+                                            : undefined,
+                                      },
+                                      deposit:
+                                        requiredAccountBalance.poolCost.toString(),
+                                      gas: "300000000000000",
+                                    },
+                                  },
+                                ],
+                              })
+                            )
+                            .catch(console.error);
+                        }}
+                      >
+                        Deploy
+                      </Button>
+                    </div>
+                  )
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="text-green-600" />
+                    <span className="text-green-600">Pool deployed.</span>
+                  </div>
+                ))}
+              {poolDeployed !== undefined &&
+                poolDeployed &&
+                deployedPoolSettings &&
+                (deployedPoolSettings.owner_id === accountId ? (
+                  <>
+                    {validatorPublicKey &&
+                      deployedPoolSettings.stake_public_key !==
+                        validatorPublicKey && (
                         <div className="flex items-center gap-1">
                           <TriangleAlert className="text-red-600" />
                           <span className="text-red-600">
-                            Pool reward fee changed.
+                            Pool validator public key mismatch.
                           </span>
                           <Button
                             onClick={() => {
@@ -620,13 +661,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                       {
                                         type: "FunctionCall",
                                         params: {
-                                          methodName:
-                                            "update_reward_fee_fraction",
+                                          methodName: "update_staking_key",
                                           args: {
-                                            reward_fee_fraction: {
-                                              numerator: rewardFee,
-                                              denominator: 100,
-                                            },
+                                            stake_public_key:
+                                              validatorPublicKey,
                                           },
                                           deposit: "0",
                                           gas: "300000000000000",
@@ -635,31 +673,133 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                     ],
                                   })
                                 )
-                                .catch(console.error);
+                                .catch(console.error)
+                                .then(() => refetchDeployedPoolSettings());
                             }}
                           >
                             Update
                           </Button>
                         </div>
                       )}
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <TriangleAlert className="text-red-600" />
-                      <span className="text-red-600">
-                        Connected wallet is not the owner of this pool.
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            }
+                    {(deployedPoolSettings.reward_fee_fraction.numerator !==
+                      rewardFee ||
+                      deployedPoolSettings.reward_fee_fraction.denominator !==
+                        100) && (
+                      <div className="flex items-center gap-1">
+                        <TriangleAlert className="text-red-600" />
+                        <span className="text-red-600">
+                          Pool reward fee changed.
+                        </span>
+                        <Button
+                          onClick={() => {
+                            selector
+                              .wallet()
+                              .then((w) =>
+                                w.signAndSendTransaction({
+                                  receiverId: fullPoolId,
+                                  actions: [
+                                    {
+                                      type: "FunctionCall",
+                                      params: {
+                                        methodName:
+                                          "update_reward_fee_fraction",
+                                        args: {
+                                          reward_fee_fraction: {
+                                            numerator: rewardFee,
+                                            denominator: 100,
+                                          },
+                                        },
+                                        deposit: "0",
+                                        gas: "300000000000000",
+                                      },
+                                    },
+                                  ],
+                                })
+                              )
+                              .catch(console.error)
+                              .then(() => refetchDeployedPoolSettings());
+                          }}
+                        >
+                          Update
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {accountId ? (
+                      <div className="flex items-center gap-1">
+                        <TriangleAlert className="text-red-600" />
+                        <span className="text-red-600">
+                          Connected wallet is not the owner of this pool.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <TriangleAlert className="text-red-600" />
+                        <span className="text-red-600">
+                          No wallet connected.
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ))}
+              {totalPoolStake !== undefined && (
+                <span>Total Stake: {totalPoolStake.toFixed(1)} NEAR</span>
+              )}
+              {!loading && poolDeployed && (
+                <div className="flex gap-1 items-center">
+                  <Label className="text-base" htmlFor="stake-topup">
+                    Add Stake:{" "}
+                  </Label>
+                  <Input
+                    id="stake-topup"
+                    className="max-w-20"
+                    type="number"
+                    value={stakeTopUp}
+                    onChange={(e) => setStakeTopUp(e.target.value)}
+                  />
+                  <Button
+                    onClick={() => {
+                      selector
+                        .wallet()
+                        .then((w) =>
+                          w.signAndSendTransaction({
+                            receiverId: fullPoolId,
+                            actions: [
+                              {
+                                type: "FunctionCall",
+                                params: {
+                                  methodName: "deposit_and_stake",
+                                  args: {},
+                                  deposit: parseUnits(
+                                    stakeTopUp,
+                                    24
+                                  ).toString(),
+                                  gas: "300000000000000",
+                                },
+                              },
+                            ],
+                          })
+                        )
+                        .catch(console.error);
+                    }}
+                  >
+                    Stake
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </Section>
       )}
       {existingNearContainerSettings?.pinger && pingerAccountId && (
         <Section title="Pinger">
           <div className="flex flex-col gap-1">
-            <span>Pinger Account ID: {pingerAccountId}</span>
+            <span>
+              Pinger Account ID:{" "}
+              <span className="break-words">{pingerAccountId}</span>
+            </span>
             {pingerAccountBalance && (
               <span>
                 Pinger Balance: {pingerAccountBalance.toFixed(3)} NEAR
@@ -667,7 +807,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
             )}
             {!loading && (
               <div className="flex gap-1 items-center">
-                <Label htmlFor="pinger-topup">Top Up: </Label>
+                <Label className="text-base" htmlFor="pinger-topup">
+                  Top Up:{" "}
+                </Label>
                 <Input
                   id="pinger-topup"
                   className="max-w-20"
@@ -700,6 +842,39 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               </div>
             )}
             {/* Last ping ? */}
+          </div>
+        </Section>
+      )}
+      {myValidatorStats && (
+        <Section title="Validator Performance">
+          <div className="grid grid-cols-3 gap-2">
+            <Card>
+              <CardHeader className="flex gap-2 items-center">
+                <CardTitle>
+                  {myValidatorStats.num_produced_blocks} /{" "}
+                  {myValidatorStats.num_expected_blocks}
+                </CardTitle>{" "}
+                blocks produced
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="flex gap-2 items-center">
+                <CardTitle>
+                  {myValidatorStats.num_produced_chunks} /{" "}
+                  {myValidatorStats.num_expected_chunks}
+                </CardTitle>{" "}
+                chunks produced
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="flex gap-2 items-center">
+                <CardTitle>
+                  {myValidatorStats.num_produced_endorsements} /{" "}
+                  {myValidatorStats.num_expected_endorsements}
+                </CardTitle>{" "}
+                endorsements produced
+              </CardHeader>
+            </Card>
           </div>
         </Section>
       )}
