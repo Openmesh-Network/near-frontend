@@ -52,8 +52,10 @@ export default function HardwareDeployer({
       return;
     }
 
+    const existingInstance = ""; // Specify and existing instance to redeploy (instead of provision a new server)
+
     try {
-      const command = `export XNODE_OWNER="${address}" && curl https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
+      const cloudInit = `#cloud-config\nruncmd:\n - export XNODE_OWNER="${address}" && curl https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
 
       let ipAddress = "";
       let deploymentAuth = "";
@@ -66,17 +68,22 @@ export default function HardwareDeployer({
             params: {
               path: `v2/${
                 hardware.type === "VPS" ? "compute" : "bare-metal-devices"
-              }/`,
-              method: "POST",
+              }/${existingInstance}`,
+              method: existingInstance ? "PUT" : "POST",
               body: JSON.stringify({
-                osName: `Ubuntu 22.04${
+                osName: `Ubuntu 24.04${
                   hardware.type === "VPS" ? " (VPS)" : ""
                 }`,
                 hostname: "xnode.openmesh.network",
-                script: `#cloud-config\nruncmd:\n - ${command}`,
-                period: paymentPeriod === "yearly" ? "annually" : paymentPeriod,
-                locationName: dataCenter,
-                productId: productId,
+                script: cloudInit,
+                period: existingInstance
+                  ? undefined
+                  : paymentPeriod === "yearly"
+                  ? "annually"
+                  : paymentPeriod,
+                locationName: existingInstance ? undefined : dataCenter,
+                productId: existingInstance ? undefined : productId,
+                forceReload: existingInstance ? true : undefined,
               }),
             },
             headers: {
@@ -94,9 +101,7 @@ export default function HardwareDeployer({
           const updatedMachine = await axios
             .get("/api/hivelocity/rewrite", {
               params: {
-                path: `v2/${
-                  hardware.type === "VPS" ? "compute" : "bare-metal-devices"
-                }/${machine.deviceId}`,
+                path: `v2/${deploymentAuth}`,
                 method: "GET",
               },
               headers: {
@@ -107,26 +112,6 @@ export default function HardwareDeployer({
           ipAddress = updatedMachine.primaryIp;
         }
       } else if (hardware.providerName === "Vultr") {
-        const startupScriptId = await axios
-          .get("/api/vultr/rewrite", {
-            params: {
-              path: "v2/startup-scripts",
-              method: "POST",
-              body: JSON.stringify({
-                name: `Xnode Startup Script (Owner ${address})`,
-                type: "boot",
-                script: Buffer.from(`#!/bin/sh \n${command}`).toString(
-                  "base64"
-                ),
-              }),
-            },
-            headers: {
-              Authorization: `Bearer ${debouncedApiKey}`,
-            },
-          })
-          .then((res) => res.data as { startup_script: { id: string } })
-          .then((res) => res.startup_script.id);
-
         const productInfo = hardware.id.split("_");
         const planId = productInfo[0];
         const regionId = productInfo[1];
@@ -135,13 +120,13 @@ export default function HardwareDeployer({
             params: {
               path: `v2/${
                 hardware.type === "VPS" ? "instances" : "bare-metals"
-              }`,
-              method: "POST",
+              }${existingInstance ? `/${existingInstance}` : ""}`, // Vultr API does not like trailing slashes
+              method: existingInstance ? "PATCH" : "POST",
               body: JSON.stringify({
-                region: regionId,
-                plan: planId,
-                os_id: 1743, // {"id":1743,"name":"Ubuntu 22.04 LTS x64","arch":"x64","family":"ubuntu"}
-                script_id: startupScriptId,
+                region: existingInstance ? undefined : regionId,
+                plan: existingInstance ? undefined : planId,
+                os_id: 2284, // {"id":2284,"name":"Ubuntu 24.04 LTS x64","arch":"x64","family":"ubuntu"}
+                user_data: Buffer.from(cloudInit).toString("base64"),
                 hostname: "xnode.openmesh.network",
                 label: "Xnode",
               }),
@@ -166,9 +151,7 @@ export default function HardwareDeployer({
           const updatedMachine = await axios
             .get("/api/vultr/rewrite", {
               params: {
-                path: `v2/${
-                  hardware.type === "VPS" ? "instances" : "bare-metals"
-                }/${machine.id}`,
+                path: `v2/${deploymentAuth}`,
                 method: "GET",
               },
               headers: {

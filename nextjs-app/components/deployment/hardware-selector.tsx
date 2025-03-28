@@ -453,7 +453,7 @@ export default function HardwareSelector({
               />
               <Label htmlFor="onlyAvailable">Only Available</Label>
             </div>
-            <div className="invisible flex place-items-center gap-2">
+            <div className="flex place-items-center gap-2">
               <Checkbox
                 id="onlyDedicated"
                 checked={onlyDedicated}
