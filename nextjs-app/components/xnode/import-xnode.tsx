@@ -72,7 +72,6 @@ export function ImportXnode() {
 
                 // If domain is ip address, use insecure
                 const insecure = /^(\d{1,3}\.){3}\d{1,3}$/.test(domain);
-                console.log({ domain, insecure });
                 login({ domain, insecure, sig: settings.wallets[address] })
                   .then((session) => scopes({ session }))
                   .then((scopes) => {

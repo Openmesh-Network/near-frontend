@@ -1,8 +1,8 @@
 "use client";
 
-import { useSettings } from "../context/settings";
+import { useSetSettings, useSettings } from "../context/settings";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { CheckCircle, TriangleAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle, TriangleAlert } from "lucide-react";
 import {
   useCpu,
   useDisk,
@@ -34,13 +34,22 @@ import { ScrollArea } from "../ui/scroll-area";
 import { formatUnits, parseUnits } from "viem";
 import { Ansi } from "../ansi";
 import axios from "axios";
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import { useRouter } from "next/navigation";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
-  const { xnodes } = useSettings();
+  const settings = useSettings();
+  const setSettings = useSetSettings();
   const xnode = useMemo(
-    () => xnodes.find((x) => x.domain === domain),
-    [xnodes]
+    () => settings.xnodes.find((x) => x.domain === domain),
+    [settings.xnodes]
   );
+
+  const [busy, setBusy] = useState<boolean>(false);
+
+  const [xnodeDomain, setXnodeDomain] = useState<string>("");
+  const [acmeEmail, setAcmeEmail] = useState<string>("");
+  const { push } = useRouter();
 
   const { data: session } = useSession({ xnode });
   const { data: cpu } = useCpu({ session });
@@ -49,6 +58,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const {
     osUpdateNeeded,
     osUpdate,
+    enableHttps,
     osPatchNeeded,
     osPatch,
     xnodeManagerUpdateNeeded,
@@ -347,6 +357,73 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
 
   return (
     <div className="mt-2 flex flex-col gap-5">
+      {xnode?.insecure && (
+        <Alert>
+          <AlertTriangle />
+          <AlertTitle>WARNING: Using unencrypted communication!</AlertTitle>
+          <AlertDescription>
+            <span>
+              You should enable HTTPS before accessing any confidential
+              information on your Xnode (such as validator private keys). Setup
+              an A record pointing to this Xnode IP address ({domain}), it can
+              be under any (sub)domain. Only press the update button once the
+              record has been set and has propagated, otherwise you might become
+              locked out of your Xnode. Email is required and cannot be from a
+              blacklisted domain (e.g. @example.com).
+            </span>
+            <div className="pt-1 flex gap-2 flex-wrap">
+              <div className="flex gap-2">
+                <Label htmlFor="xnode-domain">Domain</Label>
+                <Input
+                  id="xnode-domain"
+                  className="min-w-40"
+                  value={xnodeDomain}
+                  onChange={(e) => setXnodeDomain(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <Label htmlFor="xnode-domain">ACME Email</Label>
+                <Input
+                  id="acme-email"
+                  className="min-w-40"
+                  value={acmeEmail}
+                  onChange={(e) => setAcmeEmail(e.target.value)}
+                />
+              </div>
+              <Button
+                onClick={() => {
+                  setBusy(true);
+                  enableHttps({
+                    domain: xnodeDomain,
+                    acme_email: acmeEmail,
+                  })
+                    .then(() => {
+                      setSettings({
+                        ...settings,
+                        xnodes: settings.xnodes.map((x) => {
+                          if (x === xnode) {
+                            return {
+                              ...xnode,
+                              domain: xnodeDomain,
+                              insecure: false,
+                            };
+                          }
+
+                          return x;
+                        }),
+                      });
+                      push(`/xnode/${xnodeDomain}`);
+                    })
+                    .finally(() => setBusy(false));
+                }}
+                disabled={busy}
+              >
+                Update
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       <Section title={`Monitor Xnode ${domain}`}>
         <div className="grid grid-cols-3 gap-2 max-lg:grid-cols-2 max-md:grid-cols-1">
           {cpuHistory.length > 0 && (
@@ -443,7 +520,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               <div className="flex items-center gap-1">
                 <TriangleAlert className="text-red-600" />
                 <span className="text-red-600">OS not up to date.</span>
-                <Button onClick={() => osUpdate()}>Update</Button>
+                <Button
+                  onClick={() => {
+                    setBusy(true);
+                    osUpdate().then(() => setBusy(false));
+                  }}
+                  disabled={busy}
+                >
+                  Update
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-1">
@@ -456,7 +541,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               <div className="flex items-center gap-1">
                 <TriangleAlert className="text-red-600" />
                 <span className="text-red-600">OS patch not applied.</span>
-                <Button onClick={() => osPatch()}>Patch</Button>
+                <Button
+                  onClick={() => {
+                    setBusy(true);
+                    osPatch().finally(() => setBusy(false));
+                  }}
+                  disabled={busy}
+                >
+                  Patch
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-1">
@@ -470,13 +563,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 <TriangleAlert className="text-red-600" />
                 <span className="text-red-600">NEAR app not deployed.</span>
                 <Button
-                  onClick={() =>
+                  onClick={() => {
+                    setBusy(true);
                     createNearContainer({
                       poolId,
                       poolVersion,
                       pinger,
-                    })
-                  }
+                    }).finally(() => setBusy(false));
+                  }}
+                  disabled={busy}
                 >
                   Deploy
                 </Button>
@@ -490,13 +585,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   NEAR app settings have changed.
                 </span>
                 <Button
-                  onClick={() =>
+                  onClick={() => {
+                    setBusy(true);
                     updateNearContainerSettings({
                       poolId,
                       poolVersion,
                       pinger,
-                    })
-                  }
+                    }).finally(() => setBusy(false));
+                  }}
+                  disabled={busy}
                 >
                   Update
                 </Button>
@@ -514,7 +611,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 <span className="text-red-600">
                   Xnode Manager not up to date.
                 </span>
-                <Button onClick={() => xnodeManagerUpdate()}>Update</Button>
+                <Button
+                  onClick={() => {
+                    setBusy(true);
+                    xnodeManagerUpdate().finally(() => setBusy(false));
+                  }}
+                  disabled={busy}
+                >
+                  Update
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-1">
@@ -529,7 +634,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               <div className="flex items-center gap-1">
                 <TriangleAlert className="text-red-600" />
                 <span className="text-red-600">NEAR app not up to date.</span>
-                <Button onClick={() => updateNearContainer()}>Update</Button>
+                <Button
+                  onClick={() => {
+                    setBusy(true);
+                    updateNearContainer().finally(() => setBusy(false));
+                  }}
+                  disabled={busy}
+                >
+                  Update
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-1">
@@ -593,6 +706,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                       <span className="text-red-600">Pool not deployed.</span>
                       <Button
                         onClick={() => {
+                          setBusy(true);
                           selector
                             .wallet()
                             .then((w) =>
@@ -624,8 +738,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                 ],
                               })
                             )
-                            .catch(console.error);
+                            .catch(console.error)
+                            .finally(() => setBusy(false));
                         }}
+                        disabled={busy}
                       >
                         Deploy
                       </Button>
@@ -652,6 +768,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                           </span>
                           <Button
                             onClick={() => {
+                              setBusy(true);
                               selector
                                 .wallet()
                                 .then((w) =>
@@ -674,8 +791,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                   })
                                 )
                                 .catch(console.error)
-                                .then(() => refetchDeployedPoolSettings());
+                                .then(() => refetchDeployedPoolSettings())
+                                .finally(() => setBusy(false));
                             }}
+                            disabled={busy}
                           >
                             Update
                           </Button>
@@ -692,6 +811,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         </span>
                         <Button
                           onClick={() => {
+                            setBusy(true);
                             selector
                               .wallet()
                               .then((w) =>
@@ -717,8 +837,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                 })
                               )
                               .catch(console.error)
-                              .then(() => refetchDeployedPoolSettings());
+                              .then(() => refetchDeployedPoolSettings())
+                              .finally(() => setBusy(false));
                           }}
+                          disabled={busy}
                         >
                           Update
                         </Button>
@@ -761,6 +883,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   />
                   <Button
                     onClick={() => {
+                      setBusy(true);
                       selector
                         .wallet()
                         .then((w) =>
@@ -782,8 +905,11 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                             ],
                           })
                         )
-                        .catch(console.error);
+                        .catch(console.error)
+                        .then(() => refetchTotalPoolStake())
+                        .finally(() => setBusy(false));
                     }}
+                    disabled={busy}
                   >
                     Stake
                   </Button>
@@ -819,6 +945,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 />
                 <Button
                   onClick={() => {
+                    setBusy(true);
                     selector
                       .wallet()
                       .then((w) =>
@@ -834,8 +961,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                           ],
                         })
                       )
-                      .catch(console.error);
+                      .catch(console.error)
+                      .finally(() => setBusy(false));
                   }}
+                  disabled={busy}
                 >
                   Deposit
                 </Button>

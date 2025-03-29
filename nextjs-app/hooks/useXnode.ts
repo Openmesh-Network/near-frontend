@@ -18,7 +18,7 @@ import {
 } from "@/lib/xnode";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 const usageRefetchInterval = 1000; // 1 sec
 const processesRefetchInterval = 60_000; // 60 sec
@@ -187,12 +187,12 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     [osConfig, latestOsConfig]
   );
   const osUpdate = useMemo(
-    () => () => {
+    () => async () => {
       if (!session || !osConfig || !latestOsConfig) {
         return;
       }
 
-      setOS({
+      return setOS({
         session,
         os: {
           flake:
@@ -206,6 +206,31 @@ export function usePrepareXnode({ session }: { session?: Session }) {
       }).then(() => osRefetch());
     },
     [session, osConfig, latestOsConfig, osRefetch]
+  );
+
+  const enableHttps = useMemo(
+    () =>
+      async ({
+        domain,
+        acme_email,
+      }: {
+        domain: string;
+        acme_email: string;
+      }) => {
+        if (!session) {
+          return;
+        }
+
+        return setOS({
+          session,
+          os: {
+            domain,
+            acme_email,
+            as_child: false,
+          },
+        }).catch(console.error);
+      },
+    [session, osRefetch]
   );
 
   // Important to keep the newline before and after!
@@ -226,12 +251,12 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     [osConfig, wantedOsUserConfig]
   );
   const osPatch = useMemo(
-    () => () => {
+    () => async () => {
       if (!session || !osConfig) {
         return;
       }
 
-      setOS({
+      return setOS({
         session,
         os: {
           flake:
@@ -268,12 +293,12 @@ export function usePrepareXnode({ session }: { session?: Session }) {
   }, [os, latestXnodeManagerVersion]);
 
   const xnodeManagerUpdate = useMemo(
-    () => () => {
+    () => async () => {
       if (!session) {
         return;
       }
 
-      setOS({
+      return setOS({
         session,
         os: {
           update_inputs: ["xnode-manager"],
@@ -309,7 +334,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
   }, [containers]);
   const createNearContainer = useMemo(
     () =>
-      ({
+      async ({
         poolId,
         poolVersion,
         pinger,
@@ -517,7 +542,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
   const updateNearContainerSettings = useMemo(
     () =>
-      ({
+      async ({
         poolId,
         poolVersion,
         pinger,
@@ -530,16 +555,17 @@ export function usePrepareXnode({ session }: { session?: Session }) {
           return;
         }
 
-        (`${poolId}.${poolVersion}.near` !==
-        `${existingNearContainerSettings.poolId}.${existingNearContainerSettings.poolVersion}.near`
-          ? removeFile({
-              session,
-              location: {
-                containerId,
-                path: "/var/lib/near-validator/.near/validator_key.json",
-              },
-            }).catch(console.error)
-          : new Promise((resolve) => setTimeout(resolve, 0))
+        return (
+          `${poolId}.${poolVersion}.near` !==
+          `${existingNearContainerSettings.poolId}.${existingNearContainerSettings.poolVersion}.near`
+            ? removeFile({
+                session,
+                location: {
+                  containerId,
+                  path: "/var/lib/near-validator/.near/validator_key.json",
+                },
+              }).catch(console.error)
+            : new Promise((resolve) => setTimeout(resolve, 0))
         ).then(() =>
           createNearContainer({ poolId, poolVersion, pinger })?.then(() =>
             Promise.all([nearContainerRefetch(), refetchValidatorPublicKey()])
@@ -571,12 +597,12 @@ export function usePrepareXnode({ session }: { session?: Session }) {
   }, [nearContainer, latestNearValidatorVersion]);
 
   const updateNearContainer = useMemo(
-    () => () => {
+    () => async () => {
       if (!session) {
         return;
       }
 
-      changeConfig({
+      return changeConfig({
         session,
         changes: [
           {
@@ -607,8 +633,10 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     : true;
 
   return {
+    os,
     osUpdateNeeded,
     osUpdate,
+    enableHttps,
     osPatchNeeded,
     osPatch,
     xnodeManagerUpdateNeeded,

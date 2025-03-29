@@ -96,7 +96,7 @@ export default function HardwareDeployer({
           hardware.type === "VPS" ? "compute" : "bare-metal-devices"
         }/${machine.deviceId}`;
 
-        while (!ipAddress) {
+        while (!ipAddress || ipAddress === "0.0.0.0") {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           const updatedMachine = await axios
             .get("/api/hivelocity/rewrite", {
@@ -146,7 +146,7 @@ export default function HardwareDeployer({
           hardware.type === "VPS" ? "instances" : "bare-metals"
         }/${machine.id}`;
 
-        while (ipAddress === "0.0.0.0") {
+        while (!ipAddress || ipAddress === "0.0.0.0") {
           await new Promise((resolve) => setTimeout(resolve, 1000));
           const updatedMachine = await axios
             .get("/api/vultr/rewrite", {

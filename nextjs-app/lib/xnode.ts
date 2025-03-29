@@ -33,11 +33,22 @@ export interface DiskUsage {
 export interface OS {
   flake: string;
   flake_lock: string;
+
+  xnode_owner?: string;
+  domain?: string;
+  acme_email?: string;
+  user_passwd?: string;
 }
 
 export interface OSChange {
   flake?: string;
   update_inputs?: string[];
+
+  xnode_owner?: string;
+  domain?: string;
+  acme_email?: string;
+  user_passwd?: string;
+
   as_child: boolean;
 }
 

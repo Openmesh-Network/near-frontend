@@ -79,6 +79,11 @@ export default function HardwareSelector({
   const filteredProviderData = useMemo(() => {
     return rawProviderData
       .filter((product) => {
+        if (product.providerName === "Vultr") {
+          // Installation on Vultr machines currently not working
+          return false;
+        }
+
         if (!product.price.monthly) {
           // No price or free is probably not meant to be shown
           return false;
