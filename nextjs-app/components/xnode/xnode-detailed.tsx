@@ -195,6 +195,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
         return 0;
       }
     },
+    refetchInterval: 10 * 1000, // 10s
   });
   const requiredAccountBalance = useMemo(() => {
     let poolCost = 0;
