@@ -686,6 +686,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
             </div>
             <div className="flex flex-col gap-3">
               {poolDeployed !== undefined &&
+                validatorPublicKey !== undefined &&
                 (!poolDeployed ? (
                   connectedAccountBalance !== undefined &&
                   connectedAccountBalance <
@@ -730,8 +731,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                             ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
                                             : undefined,
                                       },
-                                      deposit:
+                                      deposit: parseUnits(
                                         requiredAccountBalance.poolCost.toString(),
+                                        24
+                                      ).toString(),
                                       gas: "300000000000000",
                                     },
                                   },
