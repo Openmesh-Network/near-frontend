@@ -929,7 +929,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               Pinger Account ID:{" "}
               <span className="break-words">{pingerAccountId}</span>
             </span>
-            {pingerAccountBalance && (
+            {pingerAccountBalance !== undefined && (
               <span>
                 Pinger Balance: {pingerAccountBalance.toFixed(3)} NEAR
               </span>
