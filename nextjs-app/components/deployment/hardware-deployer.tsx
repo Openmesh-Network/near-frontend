@@ -1,9 +1,9 @@
 "use client";
 
 import { useAddress } from "@/hooks/useAddress";
-import { getSummary } from "@/lib/hardware";
+import { AdditionalStorage, getSummary } from "@/lib/hardware";
 import { HardwareProduct } from "@/lib/hardware";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
 import axios, { AxiosError } from "axios";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +16,13 @@ import Link from "next/link";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Button } from "../ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 export default function HardwareDeployer({
   hardware,
@@ -32,6 +39,23 @@ export default function HardwareDeployer({
 }) {
   const address = useAddress();
   const [paymentPeriod, setPaymentPeriod] = useState<string>("monthly");
+  const [extraStorage, setExtraStorage] = useState<number>(0);
+
+  const defaultExtraStorage: AdditionalStorage[] = [
+    { price: { monthly: 0 }, size: 0 },
+  ];
+  const { data: availableExtraStorage } = useQuery({
+    initialData: defaultExtraStorage,
+    queryKey: ["extraStorage", hardware.providerName],
+    queryFn: async () => {
+      return defaultExtraStorage.concat(
+        await fetch(`/api/${hardware.providerName.toLowerCase()}/storage`)
+          .then((res) => res.json())
+          .then((data) => data as AdditionalStorage[])
+          .catch(() => [])
+      );
+    },
+  });
 
   useEffect(() => {
     if (!hardware.price[paymentPeriod]) {
@@ -46,14 +70,15 @@ export default function HardwareDeployer({
 
   const [step, setStep] = useState<"summary" | "auth">("summary");
 
+  const [provisioning, setProvisioning] = useState<boolean>(false);
   async function provisionHardware() {
     if (!address) {
       toast("Wallet not connected");
       return;
     }
 
-    const existingInstance = ""; // Specify and existing instance to redeploy (instead of provision a new server)
-
+    const existingInstance = ""; // Specify an existing instance to redeploy (instead of provision a new server)
+    setProvisioning(true);
     try {
       const cloudInit = `#cloud-config\nruncmd:\n - export XNODE_OWNER="${address}" && curl https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
 
@@ -110,6 +135,22 @@ export default function HardwareDeployer({
             })
             .then((res) => res.data as { primaryIp: string });
           ipAddress = updatedMachine.primaryIp;
+        }
+
+        if (extraStorage > 0 && !existingInstance) {
+          await axios.get("/api/hivelocity/rewrite", {
+            params: {
+              path: `v2/vps/volume`,
+              method: "POST",
+              body: JSON.stringify({
+                deviceId: machine.deviceId,
+                size: extraStorage,
+              }),
+            },
+            headers: {
+              "X-API-KEY": debouncedApiKey,
+            },
+          });
         }
       } else if (hardware.providerName === "Vultr") {
         const productInfo = hardware.id.split("_");
@@ -199,6 +240,8 @@ export default function HardwareDeployer({
         description: errorMessage,
         style: { backgroundColor: "red" },
       });
+    } finally {
+      setProvisioning(false);
     }
   }
 
@@ -264,8 +307,28 @@ export default function HardwareDeployer({
                 {hardware.location}
               </div>
             </div>
-            <div className="mt-2">
+            <div className="flex flex-col gap-2 mt-2">
               <span className="text-muted-foreground">{summary}</span>
+              {availableExtraStorage.length > 1 && (
+                <div className="flex gap-3">
+                  <Label>Add Storage</Label>
+                  <Select
+                    value={extraStorage.toString()}
+                    onValueChange={(e) => setExtraStorage(parseInt(e))}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableExtraStorage.map((storage, i) => (
+                        <SelectItem key={i} value={storage.size.toString()}>
+                          {storage.size} GB (+${storage.price.monthly}/mo)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <Separator className="my-4" />
             <div className="flex gap-4 place-items-center">
@@ -371,6 +434,7 @@ export default function HardwareDeployer({
               setStep("summary");
             }
           }}
+          disabled={provisioning}
         >
           Back
         </Button>
@@ -385,7 +449,7 @@ export default function HardwareDeployer({
               provisionHardware();
             }
           }}
-          disabled={step === "auth" && !validApiKey}
+          disabled={(step === "auth" && !validApiKey) || provisioning}
         >
           {step === "summary" ? "Next" : step === "auth" ? "Rent Server" : ""}
         </Button>

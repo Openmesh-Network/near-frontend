@@ -203,7 +203,9 @@ export function usePrepareXnode({ session }: { session?: Session }) {
             latestOsConfig.afterUserConfig,
           as_child: false,
         },
-      }).then(() => osRefetch());
+      })
+        .catch(console.error)
+        .then(() => osRefetch());
     },
     [session, osConfig, latestOsConfig, osRefetch]
   );
@@ -243,6 +245,11 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     "net.ipv4.tcp_wmem" = "4096 16384 8388608";
     "net.ipv4.tcp_slow_start_after_idle" = 0;
   };
+
+  networking.firewall.allowedTCPPorts = [
+    3030
+    24567
+  ];
 }
 `;
 
@@ -267,7 +274,9 @@ export function usePrepareXnode({ session }: { session?: Session }) {
             osConfig.afterUserConfig,
           as_child: false,
         },
-      }).then(() => osRefetch());
+      })
+        .catch(console.error)
+        .then(() => osRefetch());
     },
     [session, osConfig, wantedOsUserConfig, osRefetch]
   );
@@ -567,9 +576,11 @@ export function usePrepareXnode({ session }: { session?: Session }) {
               }).catch(console.error)
             : new Promise((resolve) => setTimeout(resolve, 0))
         ).then(() =>
-          createNearContainer({ poolId, poolVersion, pinger })?.then(() =>
-            Promise.all([nearContainerRefetch(), refetchValidatorPublicKey()])
-          )
+          createNearContainer({ poolId, poolVersion, pinger })
+            ?.catch(console.error)
+            .then(() =>
+              Promise.all([nearContainerRefetch(), refetchValidatorPublicKey()])
+            )
         );
       },
     [session, containerId, createNearContainer, existingNearContainerSettings]

@@ -19,6 +19,11 @@ export interface HardwareProduct {
   network: { speed?: number; max_usage?: number };
 }
 
+export interface AdditionalStorage {
+  price: { [duration: string]: number | undefined };
+  size: number;
+}
+
 export function getSummary({ hardware }: { hardware: HardwareProduct }) {
   let summary = "";
   if (hardware.cpu.name) summary += `${hardware.cpu.name}: `;

@@ -43,6 +43,7 @@ export function DeployXnode() {
           </DialogHeader>
           <Separator />
           <HardwareSelector
+            specs={{ ram: 8000, storage: 0 }}
             onSelect={(hardware) => setStep({ type: "deploy", hardware })}
           />
         </DialogContent>

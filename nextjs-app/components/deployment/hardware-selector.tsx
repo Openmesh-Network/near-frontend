@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
-import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 
 const STEP_MIN = 1;
 const STEP_MAX = 1000;
@@ -79,11 +78,6 @@ export default function HardwareSelector({
   const filteredProviderData = useMemo(() => {
     return rawProviderData
       .filter((product) => {
-        if (product.providerName === "Vultr") {
-          // Installation on Vultr machines currently not working
-          return false;
-        }
-
         if (!product.price.monthly) {
           // No price or free is probably not meant to be shown
           return false;

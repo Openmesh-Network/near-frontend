@@ -175,7 +175,9 @@ export async function diskUsage({
   return session.axiosInstance
     .get(`${session.baseUrl}/usage/disk`)
     .then((res) => res.data as DiskUsage[])
-    .then((disk) => disk.filter((d) => d.name.startsWith("/mnt")))
+    .then((disk) =>
+      disk.filter((d) => d.name.startsWith("/dev/disk/by-partlabel"))
+    )
     .then((disk) =>
       disk.filter((d1, i) => disk.findIndex((d2) => d1.name === d2.name) === i)
     );

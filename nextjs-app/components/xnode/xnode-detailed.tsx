@@ -446,7 +446,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 {disk.map((d, i) => (
                   <div key={i} className="flex flex-col">
                     <span className="text-sm">
-                      Disk {d.name.replace("/mnt/disk", "")}
+                      Disk{" "}
+                      {d.name
+                        .replace("/dev/disk/by-partlabel/disk-disk", "")
+                        .replace("-root", "")}
                     </span>
                     <Bar
                       used={d.used}
