@@ -130,10 +130,7 @@ export function XnodeSummary({ xnode }: { xnode: Xnode }) {
               {disk.map((d, i) => (
                 <div key={i} className="flex flex-col">
                   <span className="text-sm">
-                    Disk{" "}
-                    {d.name
-                      .replace("/dev/disk/by-partlabel/disk-disk", "")
-                      .replace("-root", "")}
+                    Disk {d.mount_point.replace("/mnt/disk", "")}
                   </span>
                   <Bar
                     used={d.used}

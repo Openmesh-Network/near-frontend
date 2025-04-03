@@ -25,7 +25,7 @@ export interface MemoryUsage {
 }
 
 export interface DiskUsage {
-  name: string;
+  mount_point: string;
   used: number;
   total: number;
 }
@@ -175,11 +175,16 @@ export async function diskUsage({
   return session.axiosInstance
     .get(`${session.baseUrl}/usage/disk`)
     .then((res) => res.data as DiskUsage[])
+    .then((disk) => {
+      console.log(disk);
+      return disk;
+    })
+    .then((disk) => disk.filter((d) => d.mount_point.startsWith("/mnt")))
     .then((disk) =>
-      disk.filter((d) => d.name.startsWith("/dev/disk/by-partlabel"))
-    )
-    .then((disk) =>
-      disk.filter((d1, i) => disk.findIndex((d2) => d1.name === d2.name) === i)
+      disk.filter(
+        (d1, i) =>
+          disk.findIndex((d2) => d1.mount_point === d2.mount_point) === i
+      )
     );
 }
 
