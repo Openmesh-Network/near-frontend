@@ -1,13 +1,11 @@
 "use client";
 
-import { useAddress } from "@/hooks/useAddress";
 import { AdditionalStorage, getSummary } from "@/lib/hardware";
 import { HardwareProduct } from "@/lib/hardware";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { ComboBox } from "../ui/combobox";
 import { Separator } from "../ui/separator";
 import { MapPin, TriangleAlert } from "lucide-react";
@@ -23,6 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { useProvision } from "@/hooks/useProvision";
+import { toast } from "sonner";
+import { useAddress } from "@/hooks/useAddress";
 
 export default function HardwareDeployer({
   hardware,
@@ -37,7 +38,6 @@ export default function HardwareDeployer({
   }) => void;
   onCancel: () => void;
 }) {
-  const address = useAddress();
   const [paymentPeriod, setPaymentPeriod] = useState<string>("monthly");
   const [extraStorage, setExtraStorage] = useState<number>(0);
 
@@ -70,180 +70,8 @@ export default function HardwareDeployer({
 
   const [step, setStep] = useState<"summary" | "auth">("summary");
 
-  const [provisioning, setProvisioning] = useState<boolean>(false);
-  async function provisionHardware() {
-    if (!address) {
-      toast("Wallet not connected");
-      return;
-    }
-
-    const existingInstance = ""; // Specify an existing instance to redeploy (instead of provision a new server)
-    setProvisioning(true);
-    try {
-      const cloudInit = `#cloud-config\nruncmd:\n - export XNODE_OWNER="${address}" && curl https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
-
-      let ipAddress = "";
-      let deploymentAuth = "";
-      if (hardware.providerName === "Hivelocity") {
-        const productInfo = hardware.id.split("_");
-        const productId = Number(productInfo[0]);
-        const dataCenter = productInfo[1];
-        const machine = await axios
-          .get("/api/hivelocity/rewrite", {
-            params: {
-              path: `v2/${
-                hardware.type === "VPS" ? "compute" : "bare-metal-devices"
-              }/${existingInstance}`,
-              method: existingInstance ? "PUT" : "POST",
-              body: JSON.stringify({
-                osName: `Ubuntu 24.04${
-                  hardware.type === "VPS" ? " (VPS)" : ""
-                }`,
-                hostname: "xnode.openmesh.network",
-                script: cloudInit,
-                period: existingInstance
-                  ? undefined
-                  : paymentPeriod === "yearly"
-                  ? "annually"
-                  : paymentPeriod,
-                locationName: existingInstance ? undefined : dataCenter,
-                productId: existingInstance ? undefined : productId,
-                forceReload: existingInstance ? true : undefined,
-              }),
-            },
-            headers: {
-              "X-API-KEY": debouncedApiKey,
-            },
-          })
-          .then((res) => res.data as { deviceId: number; primaryIp: string });
-        ipAddress = machine.primaryIp;
-        deploymentAuth = `${
-          hardware.type === "VPS" ? "compute" : "bare-metal-devices"
-        }/${machine.deviceId}`;
-
-        while (!ipAddress || ipAddress === "0.0.0.0") {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          const updatedMachine = await axios
-            .get("/api/hivelocity/rewrite", {
-              params: {
-                path: `v2/${deploymentAuth}`,
-                method: "GET",
-              },
-              headers: {
-                "X-API-KEY": debouncedApiKey,
-              },
-            })
-            .then((res) => res.data as { primaryIp: string });
-          ipAddress = updatedMachine.primaryIp;
-        }
-
-        if (extraStorage > 0 && !existingInstance) {
-          await axios.get("/api/hivelocity/rewrite", {
-            params: {
-              path: `v2/vps/volume`,
-              method: "POST",
-              body: JSON.stringify({
-                deviceId: machine.deviceId,
-                size: extraStorage,
-              }),
-            },
-            headers: {
-              "X-API-KEY": debouncedApiKey,
-            },
-          });
-        }
-      } else if (hardware.providerName === "Vultr") {
-        const productInfo = hardware.id.split("_");
-        const planId = productInfo[0];
-        const regionId = productInfo[1];
-        const machine = await axios
-          .get("/api/vultr/rewrite", {
-            params: {
-              path: `v2/${
-                hardware.type === "VPS" ? "instances" : "bare-metals"
-              }${existingInstance ? `/${existingInstance}` : ""}`, // Vultr API does not like trailing slashes
-              method: existingInstance ? "PATCH" : "POST",
-              body: JSON.stringify({
-                region: existingInstance ? undefined : regionId,
-                plan: existingInstance ? undefined : planId,
-                os_id: 2284, // {"id":2284,"name":"Ubuntu 24.04 LTS x64","arch":"x64","family":"ubuntu"}
-                user_data: Buffer.from(cloudInit).toString("base64"),
-                hostname: "xnode.openmesh.network",
-                label: "Xnode",
-              }),
-            },
-            headers: {
-              Authorization: `Bearer ${debouncedApiKey}`,
-            },
-          })
-          .then(
-            (res) =>
-              (hardware.type === "VPS"
-                ? res.data.instance
-                : res.data.bare_metal) as { id: number; main_ip: string }
-          );
-        ipAddress = machine.main_ip;
-        deploymentAuth = `${
-          hardware.type === "VPS" ? "instances" : "bare-metals"
-        }/${machine.id}`;
-
-        while (!ipAddress || ipAddress === "0.0.0.0") {
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          const updatedMachine = await axios
-            .get("/api/vultr/rewrite", {
-              params: {
-                path: `v2/${deploymentAuth}`,
-                method: "GET",
-              },
-              headers: {
-                Authorization: `Bearer ${debouncedApiKey}`,
-              },
-            })
-            .then(
-              (res) =>
-                (hardware.type === "VPS"
-                  ? res.data.instance
-                  : res.data.bare_metal) as { id: number; main_ip: string }
-            );
-          ipAddress = updatedMachine.main_ip;
-        }
-      }
-
-      onDeployed({
-        ipAddress,
-        deploymentAuth: `${hardware.providerName}::${deploymentAuth}`,
-        owner: address,
-      });
-      setStep("summary");
-    } catch (err: any) {
-      let errorMessage: string = "An unknown error has occurred.";
-      if (err instanceof AxiosError) {
-        if (err.response?.data?.error) {
-          if (typeof err.response.data.error.message === "string") {
-            errorMessage = err.response.data.error.message;
-          } else if (typeof err.response.data.error.description === "string") {
-            errorMessage = err.response.data.error.description;
-          } else if (typeof err.response.data.error.error === "string") {
-            errorMessage = err.response.data.error.error;
-          } else if (
-            err.response.data.error.at &&
-            typeof err.response.data.error.at(0) === "string"
-          ) {
-            errorMessage = err.response.data.error.at(0);
-          }
-        }
-      } else if (err?.message) {
-        errorMessage = err.message;
-      }
-
-      toast("Error", {
-        description: errorMessage,
-        style: { backgroundColor: "red" },
-      });
-    } finally {
-      setProvisioning(false);
-    }
-  }
+  const address = useAddress();
+  const { provisioning, provisionHardware } = useProvision();
 
   const [apiKey, setApiKey] = useState<string>("");
   const debouncedApiKey = useDebounce(apiKey, 500);
@@ -446,7 +274,35 @@ export default function HardwareDeployer({
               setStep("auth");
             }
             if (step === "auth") {
-              provisionHardware();
+              if (!address) {
+                toast("Error", {
+                  description: "Wallet not connected.",
+                  style: { backgroundColor: "red" },
+                });
+                return;
+              }
+
+              provisionHardware({
+                hardware,
+                paymentPeriod,
+                debouncedApiKey,
+                extraStorage,
+                owner: address,
+              }).then((res) => {
+                if (res.type === "success") {
+                  onDeployed({
+                    ipAddress: res.ipAddress,
+                    deploymentAuth: res.deploymentAuth,
+                    owner: address,
+                  });
+                  setStep("summary");
+                } else {
+                  toast("Error", {
+                    description: res.errorMessage,
+                    style: { backgroundColor: "red" },
+                  });
+                }
+              });
             }
           }}
           disabled={(step === "auth" && !validApiKey) || provisioning}
