@@ -602,6 +602,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         poolId,
                         poolVersion,
                         pinger,
+                        reset: false,
                       }).finally(() => setBusy(false));
                     }}
                     disabled={busy}
@@ -613,6 +614,20 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 <div className="flex items-center gap-1">
                   <CheckCircle className="text-green-600" />
                   <span className="text-green-600">NEAR app deployed.</span>
+                  <Button
+                    onClick={() => {
+                      setBusy(true);
+                      updateNearContainerSettings({
+                        poolId,
+                        poolVersion,
+                        pinger,
+                        reset: true,
+                      }).finally(() => setBusy(false));
+                    }}
+                    disabled={busy}
+                  >
+                    Reset NEAR data
+                  </Button>
                 </div>
               ))}
             {xnodeManagerUpdateNeeded !== undefined &&

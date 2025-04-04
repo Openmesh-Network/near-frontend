@@ -337,3 +337,27 @@ export async function getDirectory({
     })
     .then((res) => res.data as Directory);
 }
+
+export async function removeDirectory({
+  session,
+  location,
+  make_empty,
+}: {
+  session: Session;
+  location: {
+    containerId: string;
+    path: string;
+  };
+  make_empty: boolean;
+}): Promise<File> {
+  return session.axiosInstance.post(
+    `${session.baseUrl}/file/remove_directory`,
+    {
+      location: {
+        container: location.containerId,
+        path: location.path.substring(1), // Remove first /
+      },
+      make_empty,
+    }
+  );
+}

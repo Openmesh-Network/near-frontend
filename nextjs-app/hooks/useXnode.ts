@@ -12,6 +12,7 @@ import {
   getProcesses,
   login,
   memoryUsage,
+  removeDirectory as removeDirectory,
   removeFile,
   Session,
   setOS,
@@ -555,33 +556,51 @@ export function usePrepareXnode({ session }: { session?: Session }) {
         poolId,
         poolVersion,
         pinger,
+        reset,
       }: {
         poolId: string;
         poolVersion: string;
         pinger: boolean;
+        reset: boolean;
       }) => {
         if (!session || !existingNearContainerSettings) {
           return;
         }
 
         return (
-          `${poolId}.${poolVersion}.near` !==
-          `${existingNearContainerSettings.poolId}.${existingNearContainerSettings.poolVersion}.near`
-            ? removeFile({
+          reset
+            ? removeDirectory({
                 session,
                 location: {
                   containerId,
-                  path: "/var/lib/near-validator/.near/validator_key.json",
+                  path: "/var/lib/near-validator/.near/data",
                 },
+                make_empty: true,
               }).catch(console.error)
             : new Promise((resolve) => setTimeout(resolve, 0))
-        ).then(() =>
-          createNearContainer({ poolId, poolVersion, pinger })
-            ?.catch(console.error)
-            .then(() =>
-              Promise.all([nearContainerRefetch(), refetchValidatorPublicKey()])
-            )
-        );
+        )
+          .then(() =>
+            `${poolId}.${poolVersion}.near` !==
+            `${existingNearContainerSettings.poolId}.${existingNearContainerSettings.poolVersion}.near`
+              ? removeFile({
+                  session,
+                  location: {
+                    containerId,
+                    path: "/var/lib/near-validator/.near/validator_key.json",
+                  },
+                }).catch(console.error)
+              : new Promise((resolve) => setTimeout(resolve, 0))
+          )
+          .then(() =>
+            createNearContainer({ poolId, poolVersion, pinger })
+              ?.catch(console.error)
+              .then(() =>
+                Promise.all([
+                  nearContainerRefetch(),
+                  refetchValidatorPublicKey(),
+                ])
+              )
+          );
       },
     [session, containerId, createNearContainer, existingNearContainerSettings]
   );
