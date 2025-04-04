@@ -605,6 +605,27 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     [session, containerId, createNearContainer, existingNearContainerSettings]
   );
 
+  const removeNearContainer = useMemo(
+    () => async () => {
+      if (!session) {
+        return;
+      }
+
+      return await changeConfig({
+        session,
+        changes: [
+          {
+            Remove: {
+              container: containerId,
+              backup: false,
+            },
+          },
+        ],
+      }).catch(console.error);
+    },
+    [session, containerId]
+  );
+
   const { data: latestNearValidatorVersion } = useQuery({
     queryKey: ["latest-near-validator"],
     queryFn: async () => {
@@ -676,6 +697,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     createNearContainer,
     existingNearContainerSettings,
     updateNearContainerSettings,
+    removeNearContainer,
     nearContainerUpdateNeeded,
     updateNearContainer,
     ready,

@@ -70,6 +70,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     createNearContainer,
     existingNearContainerSettings,
     updateNearContainerSettings,
+    removeNearContainer,
     nearContainerUpdateNeeded,
     updateNearContainer,
     validatorPublicKey,
@@ -627,6 +628,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     disabled={busy}
                   >
                     Reset NEAR data
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setBusy(true);
+                      removeNearContainer().finally(() => setBusy(false));
+                    }}
+                    disabled={busy}
+                  >
+                    Uninstall NEAR app
                   </Button>
                 </div>
               ))}
