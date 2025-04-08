@@ -477,7 +477,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 id="poolId"
                 className="max-w-40"
                 value={poolId}
-                onChange={(e) => setPoolId(e.target.value)}
+                onChange={(e) => setPoolId(e.target.value.toLowerCase())}
               />
             </RowDiv>
             <RowDiv>
@@ -596,7 +596,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         reset: false,
                       }).finally(() => setBusy(false));
                     }}
-                    disabled={busy}
+                    disabled={!validatorLogs || busy}
                   >
                     Update
                   </Button>
@@ -634,7 +634,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                       setBusy(true);
                       updateNearContainer().finally(() => setBusy(false));
                     }}
-                    disabled={busy}
+                    disabled={!validatorLogs || busy}
                   >
                     Update
                   </Button>
@@ -993,7 +993,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   reset: true,
                 }).finally(() => setBusy(false));
               }}
-              disabled={busy}
+              disabled={!validatorLogs || busy}
             >
               Delete NEAR chain data
             </Button>
@@ -1003,7 +1003,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 setBusy(true);
                 removeNearContainer().finally(() => setBusy(false));
               }}
-              disabled={busy}
+              disabled={!validatorLogs || busy}
             >
               Uninstall NEAR app
             </Button>
