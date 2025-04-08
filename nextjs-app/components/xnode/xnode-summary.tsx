@@ -36,9 +36,9 @@ export function XnodeSummary({ xnode }: { xnode: Xnode }) {
   }, [connectingDots, setConnectingDots]);
 
   return (
-    <Card className="gap-0">
+    <Card className="gap-0 bg-[#0c2246d6] text-white">
       <CardHeader>
-        <CardTitle className="text-lg">{xnode.domain}</CardTitle>
+        <CardTitle className="text-xl">{xnode.domain}</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">

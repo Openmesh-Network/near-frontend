@@ -6,8 +6,8 @@ import React from "react";
 
 export default function IndexPage() {
   return (
-    <div className="mt-2 flex flex-col gap-5">
-      <Section title="My Xnodes">
+    <div className="flex flex-col gap-5">
+      <Section title="My NEAR Nodes">
         <div className="flex flex-col gap-2">
           <div className="flex gap-3 items-center">
             <DeployXnode />

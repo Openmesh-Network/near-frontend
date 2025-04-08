@@ -9,10 +9,11 @@ import { cn } from "@/lib/utils";
 import { ContextProvider } from "@/components/context-provider";
 import { headers } from "next/headers";
 import { LoginXnode } from "@/components/xnode/login";
+import Background from "@/public/background.webp";
 
 // Use local copy to avoid having NextJS fetch the file on the Internet during build time
-const inter = localFont({
-  src: "./InterVariable.ttf",
+const font = localFont({
+  src: "./AeonikFono-Regular.otf",
 });
 
 export const metadata: Metadata = {
@@ -22,9 +23,9 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   icons: {
-    icon: "/icon.png",
-    shortcut: "/icon.png",
-    apple: "/icon.png",
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
   },
 };
 
@@ -49,12 +50,15 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <body
           className={cn(
             "min-h-screen bg-background antialiased",
-            inter.className
+            font.className
           )}
+          style={{
+            backgroundImage: `url(${Background.src})`,
+          }}
         >
           <Header />
           <ContextProvider cookies={cookies}>
-            {children}
+            <div className="m-2">{children}</div>
             <LoginXnode />
           </ContextProvider>
         </body>

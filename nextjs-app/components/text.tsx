@@ -10,7 +10,7 @@ export function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className={cn("flex flex-col mx-2", className)}>
+    <div className={cn("flex flex-col", className)}>
       <Title title={title} />
       {children}
     </div>

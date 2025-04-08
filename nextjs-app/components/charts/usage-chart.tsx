@@ -32,7 +32,7 @@ export function UsageChart({
   data: UsageHistory[];
 }) {
   return (
-    <Card>
+    <Card className="bg-[#0c2246d6] text-white">
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
@@ -42,7 +42,7 @@ export function UsageChart({
           config={{
             usage: {
               label,
-              color: "hsl(221.2,83.2%,53.3%)",
+              color: "#AAFF00",
             },
           }}
         >
@@ -57,7 +57,20 @@ export function UsageChart({
             <CartesianGrid vertical={false} />
             <ChartTooltip
               cursor={false}
-              content={<ChartTooltipContent indicator="dot" hideLabel />}
+              content={
+                <ChartTooltipContent
+                  className="bg-[#0c2246d6] min-w-auto"
+                  indicator="dot"
+                  hideLabel
+                  formatter={(value, name, item, index, payload) => (
+                    <div className="flex gap-1">
+                      <div className="bg-[#AAFF00] size-4 rounded-sm" />
+                      <span>{label}:</span>
+                      <span>{value.toString().substring(0, 5)}%</span>
+                    </div>
+                  )}
+                />
+              }
             />
             <YAxis domain={[0, 100]} />
             <Area

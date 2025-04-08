@@ -11,9 +11,9 @@ import {
   usePrepareXnode,
   useSession,
 } from "@/hooks/useXnode";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { UsageChart, UsageHistory } from "../charts/usage-chart";
-import { Section } from "../text";
+import { Section, Title } from "../text";
 import { Button } from "../ui/button";
 import { Bar } from "../bar";
 import { Label } from "../ui/label";
@@ -38,6 +38,8 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import HardwareReset from "../deployment/hardware-reset";
+import Image from "next/image";
+import NearLogo from "@/public/images/near/near.svg";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
   const settings = useSettings();
@@ -363,12 +365,12 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
 
   return (
     <>
-      <div className="mt-2 flex flex-col gap-5">
+      <div className="flex flex-col gap-5">
         {xnode?.insecure && (
-          <Alert>
+          <Alert className="bg-[#0c2246d6] text-white">
             <AlertTriangle />
             <AlertTitle>WARNING: Using unencrypted communication!</AlertTitle>
-            <AlertDescription>
+            <AlertDescription className="text-muted">
               <span>
                 You should enable HTTPS before accessing any confidential
                 information on your Xnode (such as validator private keys).
@@ -431,50 +433,45 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
             </AlertDescription>
           </Alert>
         )}
-        <Section title={`Monitor Xnode ${domain}`}>
-          <div className="flex flex-col gap-1">
-            <Button className="max-w-28" onClick={() => setResetOpen(true)}>
-              Reset
-            </Button>
-            <div className="grid grid-cols-3 gap-2 max-lg:grid-cols-2 max-md:grid-cols-1">
-              {cpuHistory.length > 0 && (
-                <UsageChart title="CPU Usage" label="CPU%" data={cpuHistory} />
-              )}
-              {memoryHistory.length > 0 && (
-                <UsageChart
-                  title="Memory Usage"
-                  label="MEM%"
-                  data={memoryHistory}
-                />
-              )}
-              {disk && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Disk Usage</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {disk.map((d, i) => (
-                      <div key={i} className="flex flex-col">
-                        <span className="text-sm">
-                          Disk {d.mount_point.replace("/mnt/disk", "")}
-                        </span>
-                        <Bar
-                          used={d.used}
-                          total={d.total}
-                          label="GB"
-                          divider={1024 * 1024 * 1024}
-                        />
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+        <Section title="Monitor NEAR Node">
+          <div className="grid grid-cols-3 gap-2 max-lg:grid-cols-2 max-md:grid-cols-1">
+            {cpuHistory.length > 0 && (
+              <UsageChart title="CPU Usage" label="CPU" data={cpuHistory} />
+            )}
+            {memoryHistory.length > 0 && (
+              <UsageChart
+                title="Memory Usage"
+                label="Memory"
+                data={memoryHistory}
+              />
+            )}
+            {disk && (
+              <Card className="bg-[#0c2246d6] text-white">
+                <CardHeader>
+                  <CardTitle>Disk Usage</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {disk.map((d, i) => (
+                    <div key={i} className="flex flex-col">
+                      <span className="text-sm">
+                        Disk {d.mount_point.replace("/mnt/disk", "")}
+                      </span>
+                      <Bar
+                        used={d.used}
+                        total={d.total}
+                        label="GB"
+                        divider={1024 * 1024 * 1024}
+                      />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </Section>
-        <Section title="Configure Pool">
-          <div className="flex flex-col gap-2">
-            <div className="flex gap-1">
+        <div className="flex flex-wrap max-md:flex-col gap-2">
+          <SectionCard title="Configure Pool">
+            <RowDiv>
               <Label htmlFor="poolId">Pool ID</Label>
               <Input
                 id="poolId"
@@ -482,8 +479,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 value={poolId}
                 onChange={(e) => setPoolId(e.target.value)}
               />
-            </div>
-            <div className="flex gap-1">
+            </RowDiv>
+            <RowDiv>
               <Label htmlFor="poolVersion">Pool Version</Label>
               <Select
                 value={poolVersion}
@@ -497,8 +494,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   <SelectItem value="poolv1">V1 (.poolv1.near)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex gap-1">
+            </RowDiv>
+            <RowDiv>
               <Label htmlFor="pinger">Pinger</Label>
               <Checkbox
                 id="pinger"
@@ -509,8 +506,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   }
                 }}
               />
-            </div>
-            <div className="flex gap-1">
+            </RowDiv>
+            <RowDiv>
               <Label htmlFor="rewardFee">Reward Fee</Label>
               <Input
                 id="rewardFee"
@@ -522,16 +519,13 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 value={rewardFee.toString()}
                 onChange={(e) => setRewardFee(parseInt(e.target.value))}
               />
-            </div>
-          </div>
-        </Section>
-        <Section title="Manage Xnode">
-          <div className="flex flex-col gap-3">
+            </RowDiv>
+          </SectionCard>
+          <SectionCard title="Manage NEAR Node">
             {osUpdateNeeded !== undefined &&
               (osUpdateNeeded ? (
-                <div className="flex items-center gap-1">
-                  <TriangleAlert className="text-red-600" />
-                  <span className="text-red-600">OS not up to date.</span>
+                <RowDiv>
+                  <Status type="warning" text="OS not up to date." />
                   <Button
                     onClick={() => {
                       setBusy(true);
@@ -541,18 +535,16 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   >
                     Update
                   </Button>
-                </div>
+                </RowDiv>
               ) : (
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="text-green-600" />
-                  <span className="text-green-600">OS up to date.</span>
-                </div>
+                <RowDiv>
+                  <Status type="success" text="OS up to date." />
+                </RowDiv>
               ))}
             {osPatchNeeded !== undefined &&
               (osPatchNeeded ? (
-                <div className="flex items-center gap-1">
-                  <TriangleAlert className="text-red-600" />
-                  <span className="text-red-600">OS patch not applied.</span>
+                <RowDiv>
+                  <Status type="warning" text="OS patch not applied." />
                   <Button
                     onClick={() => {
                       setBusy(true);
@@ -562,18 +554,16 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   >
                     Patch
                   </Button>
-                </div>
+                </RowDiv>
               ) : (
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="text-green-600" />
-                  <span className="text-green-600">OS patched.</span>
-                </div>
+                <RowDiv>
+                  <Status type="success" text="OS patched." />
+                </RowDiv>
               ))}
             {nearContainerMissing !== undefined &&
               (nearContainerMissing ? (
-                <div className="flex items-center gap-1">
-                  <TriangleAlert className="text-red-600" />
-                  <span className="text-red-600">NEAR app not deployed.</span>
+                <RowDiv>
+                  <Status type="warning" text="NEAR app not deployed." />
                   <Button
                     onClick={() => {
                       setBusy(true);
@@ -587,15 +577,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   >
                     Deploy
                   </Button>
-                </div>
+                </RowDiv>
               ) : existingNearContainerSettings?.poolId !== poolId ||
                 existingNearContainerSettings?.poolVersion != poolVersion ||
                 existingNearContainerSettings?.pinger != pinger ? (
-                <div className="flex items-center gap-1">
-                  <TriangleAlert className="text-red-600" />
-                  <span className="text-red-600">
-                    NEAR app settings have changed.
-                  </span>
+                <RowDiv>
+                  <Status
+                    type="warning"
+                    text="NEAR app settings have changed."
+                  />
                   <Button
                     onClick={() => {
                       setBusy(true);
@@ -610,43 +600,16 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   >
                     Update
                   </Button>
-                </div>
+                </RowDiv>
               ) : (
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="text-green-600" />
-                  <span className="text-green-600">NEAR app deployed.</span>
-                  <Button
-                    onClick={() => {
-                      setBusy(true);
-                      updateNearContainerSettings({
-                        poolId,
-                        poolVersion,
-                        pinger,
-                        reset: true,
-                      }).finally(() => setBusy(false));
-                    }}
-                    disabled={busy}
-                  >
-                    Reset NEAR data
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setBusy(true);
-                      removeNearContainer().finally(() => setBusy(false));
-                    }}
-                    disabled={busy}
-                  >
-                    Uninstall NEAR app
-                  </Button>
-                </div>
+                <RowDiv>
+                  <Status type="success" text="NEAR app deployed." />
+                </RowDiv>
               ))}
             {xnodeManagerUpdateNeeded !== undefined &&
               (xnodeManagerUpdateNeeded ? (
-                <div className="flex items-center gap-1">
-                  <TriangleAlert className="text-red-600" />
-                  <span className="text-red-600">
-                    Xnode Manager not up to date.
-                  </span>
+                <RowDiv>
+                  <Status type="warning" text="Xnode Manager not up to date." />
                   <Button
                     onClick={() => {
                       setBusy(true);
@@ -656,20 +619,16 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   >
                     Update
                   </Button>
-                </div>
+                </RowDiv>
               ) : (
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="text-green-600" />
-                  <span className="text-green-600">
-                    Xnode Manager up to date.
-                  </span>
-                </div>
+                <RowDiv>
+                  <Status type="success" text="Xnode Manager up to date." />
+                </RowDiv>
               ))}
             {nearContainerUpdateNeeded !== undefined &&
               (nearContainerUpdateNeeded ? (
-                <div className="flex items-center gap-1">
-                  <TriangleAlert className="text-red-600" />
-                  <span className="text-red-600">NEAR app not up to date.</span>
+                <RowDiv>
+                  <Status type="warning" text="NEAR app not up to date." />
                   <Button
                     onClick={() => {
                       setBusy(true);
@@ -679,48 +638,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   >
                     Update
                   </Button>
-                </div>
+                </RowDiv>
               ) : (
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="text-green-600" />
-                  <span className="text-green-600">NEAR app up to date.</span>
-                </div>
+                <RowDiv>
+                  <Status type="success" text="NEAR app up to date." />
+                </RowDiv>
               ))}
-          </div>
-        </Section>
-        {!loading && (
-          <Section title="Manage Pool">
-            <div className="flex flex-col gap-1">
-              <div className="text-sm">
-                {accountId ? (
-                  <div className="overflow-x-auto">
-                    <Button
-                      className="px-2 py-0.5 h-auto"
-                      onClick={() =>
-                        selector
-                          .wallet()
-                          .then((w) => w.signOut())
-                          .catch(console.error)
-                      }
-                    >
-                      Disconnect{" "}
-                      <span className="break-words">{accountId}</span>
-                      {connectedAccountBalance
-                        ? ` (${connectedAccountBalance.toFixed(3)} NEAR)`
-                        : ""}
-                    </Button>
-                  </div>
-                ) : (
-                  <div>
-                    <Button
-                      className="px-2 py-0.5 h-auto"
-                      onClick={() => modal.show()}
-                    >
-                      Connect NEAR wallet
-                    </Button>
-                  </div>
-                )}
-              </div>
+          </SectionCard>
+          {!loading && (
+            <SectionCard title="Manage Pool">
               <div className="flex flex-col gap-3">
                 {poolDeployed !== undefined &&
                   validatorPublicKey !== undefined &&
@@ -729,19 +655,17 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     connectedAccountBalance <
                       requiredAccountBalance.poolCost +
                         requiredAccountBalance.gasFee ? (
-                      <div className="flex items-center gap-1">
+                      <RowDiv>
+                        <Status
+                          type="warning"
+                          text={`Pool not deployed. Connected account does not have ${requiredAccountBalance.poolCost} NEAR (+ <${requiredAccountBalance.gasFee} in gas fees) required to deploy one.`}
+                        />
                         <TriangleAlert className="text-red-600" />
-                        <span className="text-red-600">
-                          Pool not deployed. Connected account does not have{" "}
-                          {requiredAccountBalance.poolCost} NEAR (+ {"<"}
-                          {requiredAccountBalance.gasFee} in gas fees) required
-                          to deploy one.
-                        </span>
-                      </div>
+                        <span className="text-red-600"></span>
+                      </RowDiv>
                     ) : (
-                      <div className="flex items-center gap-1">
-                        <TriangleAlert className="text-red-600" />
-                        <span className="text-red-600">Pool not deployed.</span>
+                      <RowDiv>
+                        <Status type="warning" text="Pool not deployed." />
                         <Button
                           onClick={() => {
                             setBusy(true);
@@ -785,13 +709,12 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         >
                           Deploy
                         </Button>
-                      </div>
+                      </RowDiv>
                     )
                   ) : (
-                    <div className="flex items-center gap-1">
-                      <CheckCircle className="text-green-600" />
-                      <span className="text-green-600">Pool deployed.</span>
-                    </div>
+                    <RowDiv>
+                      <Status type="success" text="Pool deployed." />
+                    </RowDiv>
                   ))}
                 {poolDeployed !== undefined &&
                   poolDeployed &&
@@ -801,11 +724,11 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                       {validatorPublicKey &&
                         deployedPoolSettings.stake_public_key !==
                           validatorPublicKey && (
-                          <div className="flex items-center gap-1">
-                            <TriangleAlert className="text-red-600" />
-                            <span className="text-red-600">
-                              Pool validator public key mismatch.
-                            </span>
+                          <RowDiv>
+                            <Status
+                              type="warning"
+                              text="Pool validator public key mismatch."
+                            />
                             <Button
                               onClick={() => {
                                 setBusy(true);
@@ -838,17 +761,17 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                             >
                               Update
                             </Button>
-                          </div>
+                          </RowDiv>
                         )}
                       {(deployedPoolSettings.reward_fee_fraction.numerator !==
                         rewardFee ||
                         deployedPoolSettings.reward_fee_fraction.denominator !==
                           100) && (
-                        <div className="flex items-center gap-1">
-                          <TriangleAlert className="text-red-600" />
-                          <span className="text-red-600">
-                            Pool reward fee changed.
-                          </span>
+                        <RowDiv>
+                          <Status
+                            type="warning"
+                            text="Pool reward fee changed."
+                          />
                           <Button
                             onClick={() => {
                               setBusy(true);
@@ -884,84 +807,123 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                           >
                             Update
                           </Button>
-                        </div>
+                        </RowDiv>
                       )}
                     </>
                   ) : (
                     <>
                       {accountId ? (
-                        <div className="flex items-center gap-1">
-                          <TriangleAlert className="text-red-600" />
-                          <span className="text-red-600">
-                            Connected wallet is not the owner of this pool.
-                          </span>
-                        </div>
+                        <RowDiv>
+                          <Status
+                            type="warning"
+                            text="Connected wallet is not the owner of this pool."
+                          />
+                        </RowDiv>
                       ) : (
-                        <div className="flex items-center gap-1">
-                          <TriangleAlert className="text-red-600" />
-                          <span className="text-red-600">
-                            No wallet connected.
-                          </span>
-                        </div>
+                        <RowDiv>
+                          <Status type="warning" text="No wallet connected." />
+                        </RowDiv>
                       )}
                     </>
                   ))}
                 {totalPoolStake !== undefined && (
-                  <span>Total Stake: {totalPoolStake.toFixed(1)} NEAR</span>
+                  <RowDiv>
+                    <span>Total Stake:</span>
+                    <span>{totalPoolStake.toFixed(1)} NEAR</span>
+                  </RowDiv>
                 )}
                 {!loading && poolDeployed && (
-                  <div className="flex gap-1 items-center">
+                  <RowDiv>
                     <Label className="text-base" htmlFor="stake-topup">
-                      Add Stake:{" "}
+                      Add Stake:
                     </Label>
-                    <Input
-                      id="stake-topup"
-                      className="max-w-20"
-                      type="number"
-                      value={stakeTopUp}
-                      onChange={(e) => setStakeTopUp(e.target.value)}
-                    />
+                    <div className="flex gap-1">
+                      <Input
+                        id="stake-topup"
+                        className="max-w-20"
+                        type="number"
+                        value={stakeTopUp}
+                        onChange={(e) => setStakeTopUp(e.target.value)}
+                      />
+                      <Button
+                        onClick={() => {
+                          setBusy(true);
+                          selector
+                            .wallet()
+                            .then((w) =>
+                              w.signAndSendTransaction({
+                                receiverId: fullPoolId,
+                                actions: [
+                                  {
+                                    type: "FunctionCall",
+                                    params: {
+                                      methodName: "deposit_and_stake",
+                                      args: {},
+                                      deposit: parseUnits(
+                                        stakeTopUp,
+                                        24
+                                      ).toString(),
+                                      gas: "300000000000000",
+                                    },
+                                  },
+                                ],
+                              })
+                            )
+                            .catch(console.error)
+                            .then(() => refetchTotalPoolStake())
+                            .finally(() => setBusy(false));
+                        }}
+                        disabled={busy}
+                      >
+                        Stake
+                      </Button>
+                    </div>
+                  </RowDiv>
+                )}
+              </div>
+              <div className="text-sm">
+                {accountId ? (
+                  <div className="overflow-x-auto">
                     <Button
-                      onClick={() => {
-                        setBusy(true);
+                      className="px-2 py-0.5 h-auto"
+                      onClick={() =>
                         selector
                           .wallet()
-                          .then((w) =>
-                            w.signAndSendTransaction({
-                              receiverId: fullPoolId,
-                              actions: [
-                                {
-                                  type: "FunctionCall",
-                                  params: {
-                                    methodName: "deposit_and_stake",
-                                    args: {},
-                                    deposit: parseUnits(
-                                      stakeTopUp,
-                                      24
-                                    ).toString(),
-                                    gas: "300000000000000",
-                                  },
-                                },
-                              ],
-                            })
-                          )
+                          .then((w) => w.signOut())
                           .catch(console.error)
-                          .then(() => refetchTotalPoolStake())
-                          .finally(() => setBusy(false));
-                      }}
-                      disabled={busy}
+                      }
                     >
-                      Stake
+                      Disconnect{" "}
+                      <span className="break-words">{accountId}</span>
+                      {connectedAccountBalance && (
+                        <div className="flex">
+                          <span>(</span>
+                          <Image
+                            alt="NEAR logo"
+                            src={NearLogo}
+                            width={20}
+                            height={20}
+                          />
+                          <span>{connectedAccountBalance.toFixed(3)} )</span>
+                        </div>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <Button
+                      className="px-2 py-0.5 h-auto"
+                      onClick={() => modal.show()}
+                    >
+                      Connect NEAR wallet
                     </Button>
                   </div>
                 )}
               </div>
-            </div>
-          </Section>
-        )}
-        {existingNearContainerSettings?.pinger && pingerAccountId && (
-          <Section title="Pinger">
-            <div className="flex flex-col gap-1">
+            </SectionCard>
+          )}
+          {existingNearContainerSettings?.pinger && pingerAccountId && (
+            <SectionCard title="Pinger">
               <span>
                 Pinger Account ID:{" "}
                 <span className="break-words">{pingerAccountId}</span>
@@ -972,7 +934,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 </span>
               )}
               {!loading && (
-                <div className="flex gap-1 items-center">
+                <RowDiv>
                   <Label className="text-base" htmlFor="pinger-topup">
                     Top Up:{" "}
                   </Label>
@@ -1011,16 +973,46 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   >
                     Deposit
                   </Button>
-                </div>
+                </RowDiv>
               )}
               {/* Last ping ? */}
-            </div>
-          </Section>
-        )}
+            </SectionCard>
+          )}
+          <SectionCard title="Actions">
+            <Button className="max-w-48" onClick={() => setResetOpen(true)}>
+              Reset NEAR Node
+            </Button>
+            <Button
+              className="max-w-48"
+              onClick={() => {
+                setBusy(true);
+                updateNearContainerSettings({
+                  poolId,
+                  poolVersion,
+                  pinger,
+                  reset: true,
+                }).finally(() => setBusy(false));
+              }}
+              disabled={busy}
+            >
+              Delete NEAR chain data
+            </Button>
+            <Button
+              className="max-w-48"
+              onClick={() => {
+                setBusy(true);
+                removeNearContainer().finally(() => setBusy(false));
+              }}
+              disabled={busy}
+            >
+              Uninstall NEAR app
+            </Button>
+          </SectionCard>
+        </div>
         {myValidatorStats && (
           <Section title="Validator Performance">
-            <div className="grid grid-cols-3 gap-2">
-              <Card>
+            <div className="grid grid-cols-3 gap-2 max-md:grid-cols-1">
+              <Card className="bg-[#0c2246d6] text-white">
                 <CardHeader className="flex gap-2 items-center">
                   <CardTitle>
                     {myValidatorStats.num_produced_blocks} /{" "}
@@ -1029,7 +1021,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   blocks produced
                 </CardHeader>
               </Card>
-              <Card>
+              <Card className="bg-[#0c2246d6] text-white">
                 <CardHeader className="flex gap-2 items-center">
                   <CardTitle>
                     {myValidatorStats.num_produced_chunks} /{" "}
@@ -1038,7 +1030,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   chunks produced
                 </CardHeader>
               </Card>
-              <Card>
+              <Card className="bg-[#0c2246d6] text-white">
                 <CardHeader className="flex gap-2 items-center">
                   <CardTitle>
                     {myValidatorStats.num_produced_endorsements} /{" "}
@@ -1081,5 +1073,53 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function Status({ type, text }: { type: "warning" | "success"; text: string }) {
+  return (
+    <div className="flex gap-1">
+      {type === "warning" ? (
+        <>
+          <TriangleAlert className="shrink-0 text-red-600" />
+          <span className="text-red-600">{text}</span>
+        </>
+      ) : (
+        <>
+          <CheckCircle className="shrink-0 text-green-600" />
+          <span className="text-green-600">{text}</span>
+        </>
+      )}
+    </div>
+  );
+}
+
+function RowDiv({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex gap-3 place-content-between items-center max-w-96">
+      {children}
+    </div>
+  );
+}
+
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="gap-0 bg-[#0c2246d6] text-white">
+      <CardHeader>
+        <CardTitle>
+          <Title title={title} />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="h-full flex flex-col gap-2 place-content-between">
+        <div /> {/* Force equal gap at the top */}
+        {children}
+      </CardContent>
+    </Card>
   );
 }
