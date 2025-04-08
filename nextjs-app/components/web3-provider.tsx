@@ -11,7 +11,13 @@ import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { siteConfig } from "@/config/site";
 
 // Set up queryClient
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5_000), // max 5 seconds back-off delay
+    },
+  },
+});
 
 // Get projectId from https://cloud.reown.com
 export const projectId = "1c69d30dab8a0eb7a965065331a1f04c";
