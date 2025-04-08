@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { ContextProvider } from "@/components/context-provider";
 import { headers } from "next/headers";
 import { LoginXnode } from "@/components/xnode/login";
-import Background from "@/public/background.webp";
 
 // Use local copy to avoid having NextJS fetch the file on the Internet during build time
 const font = localFont({
@@ -49,12 +48,9 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <head />
         <body
           className={cn(
-            "min-h-screen bg-background antialiased",
+            "min-h-screen antialiased bg-[#CEFF1A] bg-[url(/background.png)] bg-center bg-cover",
             font.className
           )}
-          style={{
-            backgroundImage: `url(${Background.src})`,
-          }}
         >
           <Header />
           <ContextProvider cookies={cookies}>
