@@ -348,10 +348,12 @@ export function usePrepareXnode({ session }: { session?: Session }) {
         poolId,
         poolVersion,
         pinger,
+        update,
       }: {
         poolId: string;
         poolVersion: string;
         pinger: boolean;
+        update?: boolean;
       }) => {
         if (!session) {
           return;
@@ -363,6 +365,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
             {
               Set: {
                 container: containerId,
+                update_inputs: update ? ["near-validator"] : undefined,
                 settings: {
                   flake: `{
   inputs = {
@@ -639,25 +642,20 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
   const updateNearContainer = useMemo(
     () => async () => {
-      if (!session) {
+      if (!session || !existingNearContainerSettings) {
         return;
       }
 
-      return changeConfig({
-        session,
-        changes: [
-          {
-            Set: {
-              container: containerId,
-              update_inputs: ["near-validator"],
-            },
-          },
-        ],
+      return createNearContainer({
+        poolId: existingNearContainerSettings.poolId,
+        poolVersion: existingNearContainerSettings.poolVersion,
+        pinger: existingNearContainerSettings.pinger,
+        update: true,
       })
         .catch(console.error)
         .then(() => nearContainerRefetch());
     },
-    [session, containerId, nearContainerRefetch]
+    [session, containerId, createNearContainer, existingNearContainerSettings]
   );
 
   const missingDependencies = [
