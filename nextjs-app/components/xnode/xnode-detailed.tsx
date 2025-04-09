@@ -662,8 +662,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                           type="warning"
                           text={`Pool not deployed. Connected account does not have ${requiredAccountBalance.poolCost} NEAR (+ <${requiredAccountBalance.gasFee} in gas fees) required to deploy one.`}
                         />
-                        <TriangleAlert className="text-red-600" />
-                        <span className="text-red-600"></span>
                       </RowDiv>
                     ) : (
                       <RowDiv>
