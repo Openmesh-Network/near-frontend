@@ -41,8 +41,8 @@ interface RootLayoutProps {
   children: React.ReactNode;
 }
 
-export default function RootLayout({ children }: RootLayoutProps) {
-  const cookies = headers().get("cookie");
+export default async function RootLayout({ children }: RootLayoutProps) {
+  const cookies = (await headers()).get("cookie");
 
   return (
     <>
