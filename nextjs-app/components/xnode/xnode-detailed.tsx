@@ -279,41 +279,43 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     },
   });
 
-  const { data: pingerAccountBalance } = useQuery({
-    queryKey: [
-      "pingerAccountBalance",
-      near ?? "",
-      existingNearContainerSettings?.pinger ?? false,
-      pingerAccountId ?? "",
-    ],
-    enabled:
-      !!near && existingNearContainerSettings?.pinger && !!pingerAccountId,
-    queryFn: async () => {
-      if (
-        !near ||
-        existingNearContainerSettings?.pinger !== true ||
-        !pingerAccountId
-      ) {
-        return undefined;
-      }
+  const { data: pingerAccountBalance, refetch: refetchPingerAccountBalance } =
+    useQuery({
+      queryKey: [
+        "pingerAccountBalance",
+        near ?? "",
+        existingNearContainerSettings?.pinger ?? false,
+        pingerAccountId ?? "",
+      ],
+      enabled:
+        !!near && existingNearContainerSettings?.pinger && !!pingerAccountId,
+      queryFn: async () => {
+        if (
+          !near ||
+          existingNearContainerSettings?.pinger !== true ||
+          !pingerAccountId
+        ) {
+          return undefined;
+        }
 
-      try {
-        const account = await near.connection.provider.query<AccountView>({
-          request_type: "view_account",
-          finality: "final",
-          account_id: pingerAccountId,
-        });
-        return parseFloat(formatUnits(BigInt(account.amount), 24));
-      } catch {
-        return 0;
-      }
-    },
-  });
+        try {
+          const account = await near.connection.provider.query<AccountView>({
+            request_type: "view_account",
+            finality: "final",
+            account_id: pingerAccountId,
+          });
+          return parseFloat(formatUnits(BigInt(account.amount), 24));
+        } catch {
+          return 0;
+        }
+      },
+    });
   const [pingerTopUp, setPingerTopUp] = useState<string>("0");
 
   const { data: validatorStats } = useQuery({
     queryKey: ["validatorStats", near ?? ""],
     enabled: !!near,
+    refetchInterval: 10_000, // 10 seconds
     queryFn: async () => {
       if (!near) {
         return undefined;
@@ -967,6 +969,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                           })
                         )
                         .catch(console.error)
+                        .then(() => refetchPingerAccountBalance())
                         .finally(() => setBusy(false));
                     }}
                     disabled={busy}

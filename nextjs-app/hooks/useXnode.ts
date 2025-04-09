@@ -405,18 +405,6 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
               boot.isContainer = true;
 
-              systemd.services.near-validator.serviceConfig = {
-                  DynamicUser = lib.mkForce false;
-                  User = "root";
-                  Group = "root";
-              };
-
-              systemd.services.near-validator-pinger.serviceConfig = {
-                DynamicUser = lib.mkForce false;
-                User = "root";
-                Group = "root";
-              };
-
               services.near-validator = {
                 enable = true;
                 pool = {
@@ -621,7 +609,9 @@ export function usePrepareXnode({ session }: { session?: Session }) {
             },
           },
         ],
-      }).catch(console.error);
+      })
+        .catch(console.error)
+        .then(() => containersRefetch());
     },
     [session, containerId]
   );
