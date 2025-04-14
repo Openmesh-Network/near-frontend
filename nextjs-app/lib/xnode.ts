@@ -1,5 +1,6 @@
 import { Hex, parseSignature, toBytes } from "viem";
 import axios, { AxiosInstance } from "axios";
+import https from "https";
 
 export enum Scope {
   Processes = "Processes",
@@ -118,7 +119,8 @@ export async function login({
   sig: Hex;
 }): Promise<Session> {
   const axiosInstance = axios.create({
-    withCredentials: true,
+    // httpsAgent: new https.Agent({ rejectUnauthorized: false }), // Allow self-signed certificates (for "recovery mode", no secrets should be shared from the client)
+    withCredentials: true, // Store cookies
   });
   const prefix = insecure ? "xnode-forward-insecure" : "xnode-forward";
   const baseUrl = `/${prefix}/${domain}`;

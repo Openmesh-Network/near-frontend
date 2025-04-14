@@ -19,7 +19,7 @@ import {
 } from "@/lib/xnode";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 const usageRefetchInterval = 1000; // 1 sec
 const processesRefetchInterval = 60_000; // 60 sec

@@ -137,7 +137,7 @@ export default function HardwareDeployer({
             </div>
             <div className="flex flex-col gap-2 mt-2">
               <span className="text-muted-foreground">{summary}</span>
-              {availableExtraStorage.length > 1 && (
+              {false && availableExtraStorage.length > 1 && (
                 <div className="flex gap-3">
                   <Label>Add Storage</Label>
                   <Select

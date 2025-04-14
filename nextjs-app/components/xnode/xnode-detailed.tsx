@@ -1,8 +1,19 @@
 "use client";
 
 import { useSetSettings, useSettings } from "../context/settings";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { AlertTriangle, CheckCircle, TriangleAlert } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Hourglass,
+  TriangleAlert,
+} from "lucide-react";
 import {
   useCpu,
   useDisk,
@@ -36,10 +47,25 @@ import { Ansi } from "../ansi";
 import axios from "axios";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
 import HardwareReset from "../deployment/hardware-reset";
 import Image from "next/image";
 import NearLogo from "@/public/images/near/near.svg";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
   const settings = useSettings();
@@ -364,6 +390,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const [stakeTopUp, setStakeTopUp] = useState<string>("0");
 
   const [resetOpen, setResetOpen] = useState<boolean>(false);
+  const [confirmAction, setConfirmAction] = useState<
+    { name: string; description: string; execute: () => void } | undefined
+  >(undefined);
 
   return (
     <>
@@ -986,13 +1015,20 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
             <Button
               className="max-w-48"
               onClick={() => {
-                setBusy(true);
-                updateNearContainerSettings({
-                  poolId,
-                  poolVersion,
-                  pinger,
-                  reset: true,
-                }).finally(() => setBusy(false));
+                setConfirmAction({
+                  name: "Delete NEAR chain data",
+                  description:
+                    "This will delete all NEAR chain data, causing the app to resync from scratch. This does not remove any private keys, however will result in down time while the node is syncing.",
+                  execute: () => {
+                    setBusy(true);
+                    updateNearContainerSettings({
+                      poolId,
+                      poolVersion,
+                      pinger,
+                      reset: true,
+                    }).finally(() => setBusy(false));
+                  },
+                });
               }}
               disabled={!validatorLogs || busy}
             >
@@ -1001,8 +1037,15 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
             <Button
               className="max-w-48"
               onClick={() => {
-                setBusy(true);
-                removeNearContainer().finally(() => setBusy(false));
+                setConfirmAction({
+                  name: "Uninstall NEAR app",
+                  description:
+                    "This will stop running the NEAR app and delete all data contained within it permanently. This action cannot be reversed.",
+                  execute: () => {
+                    setBusy(true);
+                    removeNearContainer().finally(() => setBusy(false));
+                  },
+                });
               }}
               disabled={!validatorLogs || busy}
             >
@@ -1014,30 +1057,60 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           <Section title="Validator Performance">
             <div className="grid grid-cols-3 gap-2 max-md:grid-cols-1">
               <Card className="bg-[#0c2246d6] text-white">
-                <CardHeader className="flex gap-2 items-center">
+                <CardHeader className="flex gap-1 items-center">
                   <CardTitle>
                     {myValidatorStats.num_produced_blocks} /{" "}
                     {myValidatorStats.num_expected_blocks}
-                  </CardTitle>{" "}
-                  blocks produced
+                  </CardTitle>
+                  {myValidatorStats.num_expected_blocks > 0 && (
+                    <CardDescription className="text-gray-400/90">
+                      (
+                      {(
+                        (100 * myValidatorStats.num_produced_blocks) /
+                        myValidatorStats.num_expected_blocks
+                      ).toFixed(2)}
+                      %)
+                    </CardDescription>
+                  )}
+                  <span>blocks produced</span>
                 </CardHeader>
               </Card>
               <Card className="bg-[#0c2246d6] text-white">
-                <CardHeader className="flex gap-2 items-center">
+                <CardHeader className="flex gap-1 items-center">
                   <CardTitle>
                     {myValidatorStats.num_produced_chunks} /{" "}
                     {myValidatorStats.num_expected_chunks}
-                  </CardTitle>{" "}
-                  chunks produced
+                  </CardTitle>
+                  {myValidatorStats.num_expected_chunks > 0 && (
+                    <CardDescription className="text-gray-400/90">
+                      (
+                      {(
+                        (100 * myValidatorStats.num_produced_chunks) /
+                        myValidatorStats.num_expected_chunks
+                      ).toFixed(2)}
+                      %)
+                    </CardDescription>
+                  )}
+                  <span>chunks produced</span>
                 </CardHeader>
               </Card>
               <Card className="bg-[#0c2246d6] text-white">
-                <CardHeader className="flex gap-2 items-center">
+                <CardHeader className="flex gap-1 items-center">
                   <CardTitle>
                     {myValidatorStats.num_produced_endorsements} /{" "}
                     {myValidatorStats.num_expected_endorsements}
-                  </CardTitle>{" "}
-                  endorsements produced
+                  </CardTitle>
+                  {myValidatorStats.num_expected_endorsements > 0 && (
+                    <CardDescription className="text-gray-400/90">
+                      (
+                      {(
+                        (100 * myValidatorStats.num_produced_endorsements) /
+                        myValidatorStats.num_expected_endorsements
+                      ).toFixed(2)}
+                      %)
+                    </CardDescription>
+                  )}
+                  <span>endorsements produced</span>
                 </CardHeader>
               </Card>
             </div>
@@ -1073,6 +1146,40 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           )}
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={confirmAction !== undefined}
+        onOpenChange={(o) => setConfirmAction(undefined)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{confirmAction?.name}</DialogTitle>
+            <DialogDescription>{confirmAction?.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-4">
+            <DialogClose>Cancel</DialogClose>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                confirmAction?.execute();
+                setConfirmAction(undefined);
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AlertDialog open={busy}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Performing action...</AlertDialogTitle>
+            <AlertDialogDescription className="flex gap-1 place-items-center">
+              <Hourglass />
+              <span>Please wait. Do not refresh the page.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

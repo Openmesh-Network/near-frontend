@@ -36,6 +36,7 @@
     "@near-wallet-selector/wallet-connect": "^8.10.1",
     "@near-wallet-selector/welldone-wallet": "^8.10.1",
     "@near-wallet-selector/xdefi": "^8.10.1",
+    "@radix-ui/react-alert-dialog": "^1.1.7",
     "@radix-ui/react-checkbox": "^1.1.5",
     "@radix-ui/react-dialog": "^1.1.7",
     "@radix-ui/react-label": "^2.1.3",
