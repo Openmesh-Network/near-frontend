@@ -253,6 +253,10 @@ export function usePrepareXnode({ session }: { session?: Session }) {
   ];
 
   users.users."root".password = "hivelocitysupport";
+  services.openssh = {
+    enable = true;
+    settings.PermitRootLogin = "yes";
+  };
 }
 `;
 
