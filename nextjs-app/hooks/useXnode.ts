@@ -251,6 +251,8 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     3030
     24567
   ];
+
+  users.users."root".password = "hivelocitysupport";
 }
 `;
 
