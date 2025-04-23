@@ -302,6 +302,27 @@ export async function getFile({
     });
 }
 
+export async function writeFile({
+  session,
+  location,
+  content,
+}: {
+  session: Session;
+  location: {
+    containerId: string;
+    path: string;
+  };
+  content: string;
+}): Promise<void> {
+  await session.axiosInstance.post(`${session.baseUrl}/file/write_file`, {
+    location: {
+      container: location.containerId,
+      path: location.path.substring(1), // Remove first /
+    },
+    content: Buffer.from(content, "utf-8").toJSON().data,
+  });
+}
+
 export async function removeFile({
   session,
   location,
@@ -311,8 +332,8 @@ export async function removeFile({
     containerId: string;
     path: string;
   };
-}): Promise<File> {
-  return session.axiosInstance.post(`${session.baseUrl}/file/remove_file`, {
+}): Promise<void> {
+  await session.axiosInstance.post(`${session.baseUrl}/file/remove_file`, {
     location: {
       container: location.containerId,
       path: location.path.substring(1), // Remove first /
@@ -351,15 +372,12 @@ export async function removeDirectory({
     path: string;
   };
   make_empty: boolean;
-}): Promise<File> {
-  return session.axiosInstance.post(
-    `${session.baseUrl}/file/remove_directory`,
-    {
-      location: {
-        container: location.containerId,
-        path: location.path.substring(1), // Remove first /
-      },
-      make_empty,
-    }
-  );
+}): Promise<void> {
+  await session.axiosInstance.post(`${session.baseUrl}/file/remove_directory`, {
+    location: {
+      container: location.containerId,
+      path: location.path.substring(1), // Remove first /
+    },
+    make_empty,
+  });
 }
