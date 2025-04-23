@@ -604,7 +604,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         pinger,
                       }).finally(() => setBusy(false));
                     }}
-                    disabled={busy}
+                    disabled={!poolId || busy}
                   >
                     Deploy
                   </Button>
@@ -627,7 +627,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         reset: false,
                       }).finally(() => setBusy(false));
                     }}
-                    disabled={!validatorLogs || busy}
+                    disabled={!validatorLogs || !poolId || busy}
                   >
                     Update
                   </Button>
