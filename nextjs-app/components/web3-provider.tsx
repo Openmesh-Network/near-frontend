@@ -53,6 +53,9 @@ createAppKit({
   networks: [aurora],
   defaultNetwork: aurora,
   metadata: metadata,
+  defaultAccountTypes: {
+    eip155: "eoa",
+  },
 });
 
 function Web3Provider({
