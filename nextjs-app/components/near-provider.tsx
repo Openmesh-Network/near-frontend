@@ -87,12 +87,12 @@ export const NearProvider: React.FC<{
         setupWelldoneWallet(),
         setupHereWallet(),
         setupCoin98Wallet(),
-        setupNearFi(),
+        // setupNearFi(),
         setupRamperWallet(),
-        setupNeth({
-          gas: "300000000000000",
-          bundle: false,
-        }),
+        // setupNeth({
+        //   gas: "300000000000000",
+        //   bundle: false,
+        // }),
         setupXDEFI(),
         setupWalletConnect({
           projectId: projectId,

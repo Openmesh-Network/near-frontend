@@ -4,4 +4,5 @@ node_modules
 # next.js
 .next/
 
+# secrets
 .env
