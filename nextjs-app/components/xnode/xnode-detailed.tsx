@@ -1141,9 +1141,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           <DialogHeader>
             <DialogTitle>Reset Xnode</DialogTitle>
           </DialogHeader>
-          {xnode && (
-            <HardwareReset xnode={xnode} onReset={() => setResetOpen(false)} />
-          )}
+          <HardwareReset xnode={xnode} onReset={() => setResetOpen(false)} />
         </DialogContent>
       </Dialog>
       <Dialog

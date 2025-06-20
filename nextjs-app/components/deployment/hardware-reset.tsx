@@ -26,7 +26,7 @@ export default function HardwareReset({
   xnode,
   onReset,
 }: {
-  xnode: Xnode;
+  xnode?: Xnode;
   onReset: () => void;
 }) {
   const address = useAddress();
@@ -43,6 +43,10 @@ export default function HardwareReset({
   }, [address, setOwner]);
 
   useEffect(() => {
+    if (!xnode) {
+      return;
+    }
+
     const deploymentAuth = xnode.deploymentAuth;
     if (deploymentAuth) {
       const split = deploymentAuth.split("::");
