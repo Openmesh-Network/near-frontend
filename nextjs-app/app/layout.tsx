@@ -8,7 +8,6 @@ import { Header } from "@/components/header";
 import { cn } from "@/lib/utils";
 import { ContextProvider } from "@/components/context-provider";
 import { headers } from "next/headers";
-import { LoginXnode } from "@/components/xnode/login";
 import Background from "@/public/background.png";
 import Image from "next/image";
 
@@ -65,7 +64,6 @@ export default async function RootLayout({ children }: RootLayoutProps) {
           <Header />
           <ContextProvider cookies={cookies}>
             <div className="m-2">{children}</div>
-            <LoginXnode />
           </ContextProvider>
         </body>
       </html>

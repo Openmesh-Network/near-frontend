@@ -166,9 +166,11 @@ export async function GET(_: NextRequest) {
     return {
       type: product.is_vps ? "VPS" : "Bare Metal",
       available:
-        /*product.stock === 'limited'
+        product.stock === "limited"
+          ? 10
+          : product.stock === "available"
           ? 1_000
-          :*/ product.stock === "available" ? 1_000_000_000 : 0,
+          : 0,
       cpu: {
         cores: product.processor_info.cores,
         threads: product.processor_info.threads,

@@ -14,14 +14,6 @@ import {
   Hourglass,
   TriangleAlert,
 } from "lucide-react";
-import {
-  useCpu,
-  useDisk,
-  useLogs,
-  useMemory,
-  usePrepareXnode,
-  useSession,
-} from "@/hooks/useXnode";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { UsageChart, UsageHistory } from "../charts/usage-chart";
 import { Section, Title } from "../text";
@@ -46,7 +38,7 @@ import { formatUnits, parseUnits } from "viem";
 import { Ansi } from "../ansi";
 import axios from "axios";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Dialog,
   DialogClose,
@@ -66,14 +58,39 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
+import { getBaseUrl } from "@/lib/xnode";
+import {
+  useAuthLogin,
+  useProcessLogs,
+  useUsageCpu,
+  useUsageDisk,
+  useUsageMemory,
+} from "@openmesh-network/xnode-manager-sdk-react";
+import { usePrepareXnode } from "@/hooks/useXnode";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
+  const searchParams = useSearchParams();
+  const baseUrl = useMemo(() => searchParams.get("baseUrl"), [searchParams]);
+
   const settings = useSettings();
   const setSettings = useSetSettings();
   const xnode = useMemo(
-    () => settings.xnodes.find((x) => x.domain === domain),
-    [settings.xnodes]
+    () => settings.xnodes.find((x) => getBaseUrl({ xnode: x }) === baseUrl),
+    [settings.xnodes, baseUrl]
   );
+
+  const { replace } = useRouter();
+  useEffect(() => {
+    if (settings && !xnode) {
+      // Xnode not in import list, redirect to home page
+      replace("/");
+    }
+  }, [settings, xnode]);
+
+  const { data: session } = useAuthLogin({
+    baseUrl: getBaseUrl({ xnode }),
+    ...xnode?.loginArgs,
+  });
 
   const [busy, setBusy] = useState<boolean>(false);
 
@@ -81,10 +98,42 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const [acmeEmail, setAcmeEmail] = useState<string>("");
   const { push } = useRouter();
 
-  const { data: session } = useSession({ xnode });
-  const { data: cpu } = useCpu({ session });
-  const { data: memory } = useMemory({ session });
-  const { data: disk } = useDisk({ session });
+  const { data: cpu, dataUpdatedAt: cpuUpdatedAt } = useUsageCpu({
+    session,
+    scope: "host",
+  });
+  const { data: memory, dataUpdatedAt: memoryUpdatedAt } = useUsageMemory({
+    session,
+    scope: "host",
+  });
+  const { data: disk } = useUsageDisk({ session, scope: "host" });
+
+  const [cpuHistory, setCpuHistory] = useState<UsageHistory[]>([]);
+  useEffect(() => {
+    if (!cpu) {
+      return;
+    }
+
+    const avgUsage = cpu.reduce((prev, cur) => prev + cur.used, 0) / cpu.length;
+    setCpuHistory([
+      ...cpuHistory.slice(-99),
+      { date: cpuUpdatedAt, usage: avgUsage },
+    ]);
+  }, [cpu, cpuUpdatedAt]);
+
+  const [memoryHistory, setMemoryHistory] = useState<UsageHistory[]>([]);
+  useEffect(() => {
+    if (!memory) {
+      return;
+    }
+
+    const usage = (100 * memory.used) / memory.total;
+    setMemoryHistory([
+      ...memoryHistory.slice(-99),
+      { date: memoryUpdatedAt, usage },
+    ]);
+  }, [memory, memoryUpdatedAt]);
+
   const {
     osUpdateNeeded,
     osUpdate,
@@ -104,9 +153,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     validatorPublicKey,
     pingerAccountId,
   } = usePrepareXnode({ session });
-  const { data: validatorLogs } = useLogs({
+  const { data: validatorLogs } = useProcessLogs({
     session,
-    containerId,
+    scope: containerId ? `container:${containerId}` : undefined,
     process: "near-validator.service",
   });
   const logsScrollAreaRef = useRef<HTMLDivElement>(null);
@@ -124,32 +173,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   useEffect(() => {
     scrollLogToBottom();
   }, [validatorLogs, scrollLogToBottom]);
-
-  const [cpuHistory, setCpuHistory] = useState<UsageHistory[]>([]);
-  useEffect(() => {
-    if (!cpu) {
-      return;
-    }
-
-    const avgUsage = cpu.reduce((prev, cur) => prev + cur.used, 0) / cpu.length;
-    setCpuHistory([
-      ...cpuHistory.slice(-99),
-      { date: Date.now(), usage: avgUsage },
-    ]);
-  }, [cpu]);
-
-  const [memoryHistory, setMemoryHistory] = useState<UsageHistory[]>([]);
-  useEffect(() => {
-    if (!memory) {
-      return;
-    }
-
-    const usage = (100 * memory.used) / memory.total;
-    setMemoryHistory([
-      ...memoryHistory.slice(-99),
-      { date: Date.now(), usage },
-    ]);
-  }, [memory]);
 
   const [poolId, setPoolId] = useState("");
   const [poolVersion, setPoolVersion] = useState("pool");
@@ -389,7 +412,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   }, [fullPoolId, validatorStats]);
   const [stakeTopUp, setStakeTopUp] = useState<string>("0");
 
-  const [resetOpen, setResetOpen] = useState<boolean>(false);
   const [confirmAction, setConfirmAction] = useState<
     { name: string; description: string; execute: () => void } | undefined
   >(undefined);
@@ -438,21 +460,25 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                       acme_email: acmeEmail,
                     })
                       .then(() => {
+                        const newXnode = {
+                          ...xnode,
+                          secure: xnodeDomain,
+                        };
                         setSettings({
                           ...settings,
                           xnodes: settings.xnodes.map((x) => {
                             if (x === xnode) {
-                              return {
-                                ...xnode,
-                                domain: xnodeDomain,
-                                insecure: false,
-                              };
+                              return newXnode;
                             }
 
                             return x;
                           }),
                         });
-                        push(`/xnode/${xnodeDomain}`);
+                        push(
+                          `/xnode?baseUrl=${getBaseUrl({
+                            xnode: newXnode,
+                          })}`
+                        );
                       })
                       .finally(() => setBusy(false));
                   }}
@@ -1009,9 +1035,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
             </SectionCard>
           )}
           <SectionCard title="Actions">
-            <Button className="max-w-48" onClick={() => setResetOpen(true)}>
-              Reset NEAR Node
-            </Button>
             <Button
               className="max-w-48"
               onClick={() => {
@@ -1122,11 +1145,13 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               <ScrollArea className="h-[500px]">
                 <div className="rounded border bg-black px-3 py-2 font-mono text-muted flex flex-col">
                   {validatorLogs.map((log, i) =>
-                    log.message.type === "string" ? (
-                      <span key={i}>{log.message.string}</span>
+                    "UTF8" in log.message ? (
+                      <span key={i}>{log.message.UTF8.output}</span>
                     ) : (
                       <Ansi key={i}>
-                        {Buffer.from(log.message.bytes).toString("utf-8")}
+                        {Buffer.from(log.message.Bytes.output).toString(
+                          "utf-8"
+                        )}
                       </Ansi>
                     )
                   )}
@@ -1136,14 +1161,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           </Section>
         )}
       </div>
-      <Dialog open={resetOpen} onOpenChange={(o) => setResetOpen(o)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reset Xnode</DialogTitle>
-          </DialogHeader>
-          <HardwareReset xnode={xnode} onReset={() => setResetOpen(false)} />
-        </DialogContent>
-      </Dialog>
       <Dialog
         open={confirmAction !== undefined}
         onOpenChange={(o) => setConfirmAction(undefined)}

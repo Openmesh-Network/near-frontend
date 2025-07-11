@@ -1,24 +1,21 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { Hex } from "viem";
+import { xnode } from "@openmesh-network/xnode-manager-sdk";
 
 export interface Xnode {
-  domain: string;
   owner: string;
-  insecure: boolean;
-  deploymentAuth?: string; // For deployments through this portal, store provider + device id for further operations
+  loginArgs: Omit<xnode.auth.login_input, "baseUrl">;
+  secure?: string;
+  insecure?: string;
+  deploymentAuth?: string; // For deployments through this frontend, store provider + device id for further operations
 }
 
 export interface Settings {
   xnodes: Xnode[];
-  wallets: {
-    [address: string]: Hex;
-  };
 }
 const defaultSettings: Settings = {
   xnodes: [],
-  wallets: {},
 };
 const SettingsContext = createContext<Settings>(defaultSettings);
 const SetSettingsContext = createContext<(settings: Settings) => void>(

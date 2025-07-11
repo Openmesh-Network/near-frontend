@@ -1,151 +1,27 @@
-import { useSettings, Xnode } from "@/components/context/settings";
-import {
-  changeConfig,
-  cpuUsage,
-  diskUsage,
-  getContainerConfig,
-  getContainers,
-  getDirectory,
-  getFile,
-  getLogs,
-  getOS,
-  getProcesses,
-  login,
-  memoryUsage,
-  removeDirectory as removeDirectory,
-  removeFile,
-  Session,
-  setOS,
-} from "@/lib/xnode";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { useMemo } from "react";
+import { xnode } from "@openmesh-network/xnode-manager-sdk";
+import {
+  awaitRequest,
+  useConfigContainerGet,
+  useConfigContainerRemove,
+  useConfigContainers,
+  useConfigContainerSet,
+  useFileReadDirectory,
+  useFileReadFile,
+  useFileRemoveDirectory,
+  useFileRemoveFile,
+  useOsGet,
+  useOsSet,
+} from "@openmesh-network/xnode-manager-sdk-react";
 
-const usageRefetchInterval = 1000; // 1 sec
-const processesRefetchInterval = 60_000; // 60 sec
-const logsRefetchInterval = 1000; // 1 sec
-
-export function useSession({ xnode }: { xnode?: Xnode }) {
-  const { wallets } = useSettings();
-  return useQuery({
-    queryKey: ["session", xnode?.domain ?? "", xnode?.insecure ?? false],
-    enabled: !!xnode,
-    queryFn: async () => {
-      if (!xnode) {
-        return undefined;
-      }
-
-      const session = await login({
-        domain: xnode.domain,
-        insecure: xnode.insecure,
-        sig: wallets[xnode.owner],
-      });
-      return session;
-    },
-  });
-}
-
-export function useCpu({ session }: { session?: Session }) {
-  return useQuery({
-    queryKey: ["cpu", session?.baseUrl ?? ""],
-    enabled: !!session,
-    queryFn: async () => {
-      if (!session) {
-        return undefined;
-      }
-
-      return await cpuUsage({ session });
-    },
-    refetchInterval: usageRefetchInterval,
-  });
-}
-
-export function useMemory({ session }: { session?: Session }) {
-  return useQuery({
-    queryKey: ["memory", session?.baseUrl ?? ""],
-    enabled: !!session,
-    queryFn: async () => {
-      if (!session) {
-        return undefined;
-      }
-
-      return await memoryUsage({ session });
-    },
-    refetchInterval: usageRefetchInterval,
-  });
-}
-
-export function useDisk({ session }: { session?: Session }) {
-  return useQuery({
-    queryKey: ["disk", session?.baseUrl ?? ""],
-    enabled: !!session,
-    queryFn: async () => {
-      if (!session) {
-        return undefined;
-      }
-
-      return await diskUsage({ session });
-    },
-    refetchInterval: usageRefetchInterval,
-  });
-}
-
-export function useProcesses({
+export function usePrepareXnode({
   session,
-  containerId,
 }: {
-  session?: Session;
-  containerId?: string;
+  session?: xnode.utils.Session;
 }) {
-  return useQuery({
-    queryKey: ["processes", containerId, process, session?.baseUrl ?? ""],
-    enabled: !!session && !!containerId && !!process,
-    queryFn: async () => {
-      if (!session || !containerId || !process) {
-        return undefined;
-      }
-
-      return await getProcesses({ session, containerId });
-    },
-    refetchInterval: processesRefetchInterval,
-  });
-}
-
-export function useLogs({
-  session,
-  containerId,
-  process,
-}: {
-  session?: Session;
-  containerId?: string;
-  process?: string;
-}) {
-  return useQuery({
-    queryKey: ["logs", containerId, process, session?.baseUrl ?? ""],
-    enabled: !!session && !!containerId && !!process,
-    queryFn: async () => {
-      if (!session || !containerId || !process) {
-        return undefined;
-      }
-
-      return await getLogs({ session, containerId, process });
-    },
-    refetchInterval: logsRefetchInterval,
-  });
-}
-
-export function usePrepareXnode({ session }: { session?: Session }) {
-  const { data: os, refetch: osRefetch } = useQuery({
-    queryKey: ["os", session?.baseUrl ?? ""],
-    enabled: !!session,
-    queryFn: async () => {
-      if (!session) {
-        return undefined;
-      }
-
-      return await getOS({ session });
-    },
-  });
+  const { data: os } = useOsGet({ session });
 
   const { data: latestOsConfig } = useQuery({
     queryKey: ["latest-os-config"],
@@ -187,6 +63,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
         : undefined,
     [osConfig, latestOsConfig]
   );
+  const { mutateAsync: setOS } = useOsSet();
   const osUpdate = useMemo(
     () => async () => {
       if (!session || !osConfig || !latestOsConfig) {
@@ -195,20 +72,26 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
       return setOS({
         session,
-        os: {
+        data: {
+          acme_email: null,
+          domain: null,
           flake:
             latestOsConfig.beforeUserConfig +
             "# START USER CONFIG" +
             osConfig.userConfig +
             "# END USER CONFIG" +
             latestOsConfig.afterUserConfig,
-          as_child: false,
+          update_inputs: null,
+          user_passwd: null,
+          xnode_owner: null,
         },
       })
-        .catch(console.error)
-        .then(() => osRefetch());
+        .then((request) =>
+          awaitRequest({ request: { session, path: request } })
+        )
+        .catch(console.error);
     },
-    [session, osConfig, latestOsConfig, osRefetch]
+    [session, osConfig, latestOsConfig]
   );
 
   const enableHttps = useMemo(
@@ -226,14 +109,21 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
         return setOS({
           session,
-          os: {
-            domain,
+          data: {
             acme_email,
-            as_child: false,
+            domain,
+            flake: null,
+            update_inputs: null,
+            user_passwd: null,
+            xnode_owner: null,
           },
-        }).catch(console.error);
+        })
+          .then((request) =>
+            awaitRequest({ request: { session, path: request } })
+          )
+          .catch(console.error);
       },
-    [session, osRefetch]
+    [session]
   );
 
   // Important to keep the newline before and after!
@@ -266,20 +156,26 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
       return setOS({
         session,
-        os: {
+        data: {
+          acme_email: null,
+          domain: null,
           flake:
             osConfig.beforeUserConfig +
             "# START USER CONFIG" +
             wantedOsUserConfig +
             "# END USER CONFIG" +
             osConfig.afterUserConfig,
-          as_child: false,
+          update_inputs: null,
+          user_passwd: null,
+          xnode_owner: null,
         },
       })
-        .catch(console.error)
-        .then(() => osRefetch());
+        .then((request) =>
+          awaitRequest({ request: { session, path: request } })
+        )
+        .catch(console.error);
     },
-    [session, osConfig, wantedOsUserConfig, osRefetch]
+    [session, osConfig, wantedOsUserConfig]
   );
 
   const { data: latestXnodeManagerVersion } = useQuery({
@@ -310,29 +206,24 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
       return setOS({
         session,
-        os: {
+        data: {
+          acme_email: null,
+          domain: null,
+          flake: null,
           update_inputs: ["xnode-manager"],
-          as_child: true,
+          user_passwd: null,
+          xnode_owner: null,
         },
       })
-        .catch(console.error)
-        .then(() => new Promise((resolve) => setTimeout(resolve, 30_000))) // As child will not await the new config, guess 30 seconds
-        .then(() => osRefetch());
+        .then((request) =>
+          awaitRequest({ request: { session, path: request } })
+        )
+        .catch(console.error);
     },
-    [session, osRefetch]
+    [session]
   );
 
-  const { data: containers, refetch: containersRefetch } = useQuery({
-    queryKey: ["containers", session?.baseUrl ?? ""],
-    enabled: !!session,
-    queryFn: async () => {
-      if (!session) {
-        return undefined;
-      }
-
-      return await getContainers({ session });
-    },
-  });
+  const { data: containers } = useConfigContainers({ session });
 
   const containerId = "near-validator";
   const nearContainerMissing = useMemo(() => {
@@ -342,6 +233,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
 
     return !containers.includes(containerId);
   }, [containers]);
+  const { mutateAsync: setContainer } = useConfigContainerSet();
   const createNearContainer = useMemo(
     () =>
       async ({
@@ -359,15 +251,14 @@ export function usePrepareXnode({ session }: { session?: Session }) {
           return;
         }
 
-        return changeConfig({
+        return setContainer({
           session,
-          changes: [
-            {
-              Set: {
-                container: containerId,
-                update_inputs: update ? ["near-validator"] : undefined,
-                settings: {
-                  flake: `{
+          path: {
+            container: containerId,
+          },
+          data: {
+            settings: {
+              flake: `{
   inputs = {
     near-validator.url = "github:Openmesh-Network/near-validator";
     nixpkgs.follows = "near-validator/nixpkgs";
@@ -435,64 +326,41 @@ export function usePrepareXnode({ session }: { session?: Session }) {
       };
     };
 }`,
-                },
-              },
+              network: null,
             },
-          ],
-        })
-          .catch(console.error)
-          .then(() => containersRefetch());
-      },
-    [session, containerId, containersRefetch]
-  );
-
-  const { data: validatorPublicKey, refetch: refetchValidatorPublicKey } =
-    useQuery({
-      queryKey: [
-        "validatorPublicKey",
-        containerId,
-        session?.baseUrl ?? "",
-        nearContainerMissing ?? true,
-      ],
-      enabled: !!session && nearContainerMissing === false,
-      queryFn: async () => {
-        if (!session || nearContainerMissing !== false) {
-          return undefined;
-        }
-
-        return await getFile({
-          session,
-          location: {
-            containerId,
-            path: "/var/lib/near-validator/.near/validator_key.json",
+            update_inputs: update ? ["near-validator"] : null,
           },
         })
-          .then(
-            (file) =>
-              JSON.parse(file.content) as {
-                account_id: string;
-                public_key: string;
-                secret_key: string;
-              }
+          .then((request) =>
+            awaitRequest({ request: { session, path: request } })
           )
-          .then((key) => key.public_key);
+          .catch(console.error);
       },
-    });
+    [session, containerId]
+  );
 
-  const { data: nearContainer, refetch: nearContainerRefetch } = useQuery({
-    queryKey: [
-      "container",
-      containerId,
-      session?.baseUrl ?? "",
-      nearContainerMissing ?? true,
-    ],
-    enabled: !!session && nearContainerMissing === false,
-    queryFn: async () => {
-      if (!session || nearContainerMissing !== false) {
-        return undefined;
-      }
+  const { data: validatorKeyFile } = useFileReadFile({
+    session,
+    path: "/var/lib/near-validator/.near/validator_key.json",
+    scope: `container:${containerId}`,
+    overrides: {
+      enabled: nearContainerMissing === false,
+    },
+  });
+  const validatorPublicKey = useMemo(() => {
+    if (!validatorKeyFile || !("UTF8" in validatorKeyFile.content)) {
+      return undefined;
+    }
 
-      return await getContainerConfig({ session, containerId });
+    return JSON.parse(validatorKeyFile.content.UTF8.output)
+      .public_key as string;
+  }, [validatorKeyFile]);
+
+  const { data: nearContainer } = useConfigContainerGet({
+    session,
+    container: containerId,
+    overrides: {
+      enabled: nearContainerMissing === false,
     },
   });
 
@@ -510,37 +378,24 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     return { poolId, poolVersion, pinger };
   }, [nearContainer]);
 
-  const { data: pingerAccountId } = useQuery({
-    queryKey: [
-      "pingerAccountId",
-      containerId,
-      session?.baseUrl ?? "",
-      nearContainerMissing ?? true,
-      existingNearContainerSettings?.pinger ?? false,
-    ],
-    enabled:
-      !!session &&
-      nearContainerMissing === false &&
-      existingNearContainerSettings?.pinger === true,
-    queryFn: async () => {
-      if (
-        !session ||
-        nearContainerMissing !== false ||
-        existingNearContainerSettings?.pinger !== true
-      ) {
-        return undefined;
-      }
-
-      return await getDirectory({
-        session,
-        location: {
-          containerId,
-          path: "/var/lib/near-validator-pinger/.near-credentials/mainnet",
-        },
-      }).then((dir) => dir.files.at(0)?.replace(".json", ""));
+  const { data: nearCredentialsFolder } = useFileReadDirectory({
+    session,
+    path: "/var/lib/near-validator-pinger/.near-credentials/mainnet",
+    scope: `container:${containerId}`,
+    overrides: {
+      enabled: nearContainerMissing === false,
     },
   });
+  const pingerAccountId = useMemo(() => {
+    if (!nearCredentialsFolder) {
+      return undefined;
+    }
 
+    return nearCredentialsFolder.files.at(0)?.replace(".json", "");
+  }, [nearCredentialsFolder]);
+
+  const { mutateAsync: removeFile } = useFileRemoveFile();
+  const { mutateAsync: removeDirectory } = useFileRemoveDirectory();
   const updateNearContainerSettings = useMemo(
     () =>
       async ({
@@ -562,11 +417,11 @@ export function usePrepareXnode({ session }: { session?: Session }) {
           reset
             ? removeDirectory({
                 session,
-                location: {
-                  containerId,
+                path: { scope: `container:${containerId}` },
+                data: {
                   path: "/var/lib/near-validator/.near/data",
+                  make_empty: true,
                 },
-                make_empty: true,
               }).catch(console.error)
             : new Promise((resolve) => setTimeout(resolve, 0))
         )
@@ -575,46 +430,33 @@ export function usePrepareXnode({ session }: { session?: Session }) {
             `${existingNearContainerSettings.poolId}.${existingNearContainerSettings.poolVersion}.near`
               ? removeFile({
                   session,
-                  location: {
-                    containerId,
+                  path: { scope: `container:${containerId}` },
+                  data: {
                     path: "/var/lib/near-validator/.near/validator_key.json",
                   },
                 }).catch(console.error)
               : new Promise((resolve) => setTimeout(resolve, 0))
           )
-          .then(() =>
-            createNearContainer({ poolId, poolVersion, pinger })
-              ?.catch(console.error)
-              .then(() =>
-                Promise.all([
-                  nearContainerRefetch(),
-                  refetchValidatorPublicKey(),
-                ])
-              )
-          );
+          .then(() => createNearContainer({ poolId, poolVersion, pinger }));
       },
     [session, containerId, createNearContainer, existingNearContainerSettings]
   );
 
+  const { mutateAsync: removeContainer } = useConfigContainerRemove();
   const removeNearContainer = useMemo(
     () => async () => {
       if (!session) {
         return;
       }
 
-      return await changeConfig({
+      return await removeContainer({
         session,
-        changes: [
-          {
-            Remove: {
-              container: containerId,
-              backup: false,
-            },
-          },
-        ],
+        path: { container: containerId },
       })
-        .catch(console.error)
-        .then(() => containersRefetch());
+        .then((request) =>
+          awaitRequest({ request: { session, path: request } })
+        )
+        .catch(console.error);
     },
     [session, containerId]
   );
@@ -631,7 +473,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
     },
   });
   const nearContainerUpdateNeeded = useMemo(() => {
-    if (!nearContainer || !latestNearValidatorVersion) {
+    if (!nearContainer?.flake_lock || !latestNearValidatorVersion) {
       return undefined;
     }
 
@@ -651,9 +493,7 @@ export function usePrepareXnode({ session }: { session?: Session }) {
         poolVersion: existingNearContainerSettings.poolVersion,
         pinger: existingNearContainerSettings.pinger,
         update: true,
-      })
-        .catch(console.error)
-        .then(() => nearContainerRefetch());
+      }).catch(console.error);
     },
     [session, containerId, createNearContainer, existingNearContainerSettings]
   );

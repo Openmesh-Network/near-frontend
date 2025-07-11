@@ -19,7 +19,7 @@ import { Slider } from "@/components/ui/slider";
 
 const STEP_MIN = 1;
 const STEP_MAX = 1000;
-const PRICE_MAX = 10000;
+const PRICE_MAX = 100000;
 
 type HardwareSelectorProps = {
   specs?: Specs;
@@ -391,7 +391,7 @@ export default function HardwareSelector({
                         ]);
                       }
                     }}
-                    className="h-8 w-24 pl-6"
+                    className="h-8 w-28 pl-6"
                   />
                 </div>
 
@@ -421,7 +421,7 @@ export default function HardwareSelector({
                         setPriceRange([priceRange[0], PRICE_MAX]);
                       }
                     }}
-                    className="h-8 w-24 pl-6"
+                    className="h-8 w-28 pl-6"
                   />
                 </div>
               </div>

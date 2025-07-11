@@ -202,6 +202,7 @@ export function useProvision() {
     debouncedApiKey: string;
     owner: string;
   }): Promise<{ type: "error"; errorMessage: string } | { type: "success" }> {
+    setProvisioning(true);
     try {
       const split = deploymentAuth.split("::");
       const provider = split[0];

@@ -1,8 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useSetSettings, useSettings } from "../context/settings";
-import { toXnodeAddress, useAddress } from "@/hooks/useAddress";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,64 +10,46 @@ import {
   DialogTitle,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
-import { useAccount, useDisconnect, useSignMessage } from "wagmi";
-import { recoverMessageAddress } from "viem";
+import { useAccount, useSignMessage } from "wagmi";
+import { SignMessageReturnType } from "viem";
 
-export function LoginXnode() {
-  const address = useAddress();
-  const settings = useSettings();
-  const setSettings = useSetSettings();
+export interface LoginXnodeParams {
+  message: string;
+  onSigned: (signature: SignMessageReturnType) => void;
+  onCancel: () => void;
+}
 
-  const hasSignature = useMemo(() => {
-    if (!address) {
-      return true;
-    } else return !!settings.wallets[address];
-  }, [address, settings]);
-
-  const { disconnectAsync } = useDisconnect();
+export function LoginXnode({ message, onSigned, onCancel }: LoginXnodeParams) {
   const { signMessageAsync } = useSignMessage();
 
   const { connector } = useAccount();
   const [signing, setSigning] = useState<boolean>(false); // disable pop up during social login signing to prevent focus steal
 
   return (
-    <Dialog open={!hasSignature && (!signing || connector?.type !== "AUTH")}>
+    <Dialog open={!signing || connector?.type !== "AUTH"}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Wallet Signature Required</DialogTitle>
           <DialogDescription>
-            To authenticate with your Xnodes, you will need to sign a message
+            To authenticate with your Xnode, you will need to sign a message
             proving ownership of your account. It does not cost any gas to sign
             this message. The message will be saved in your browser to interact
-            with all of your Xnodes until you delete it.
+            with this Xnode until you delete it.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button onClick={() => disconnectAsync().catch(console.error)}>
+          <Button
+            onClick={() => {
+              onCancel();
+            }}
+          >
             Cancel
           </Button>
           <Button
             onClick={() => {
-              const message = "Create Xnode Manager session";
               setSigning(true);
-              signMessageAsync({
-                message,
-              })
-                .then(async (sig) => {
-                  console.log(sig);
-                  const signer = await recoverMessageAddress({
-                    message,
-                    signature: sig,
-                  });
-                  setSettings({
-                    ...settings,
-                    wallets: {
-                      ...settings.wallets,
-                      [toXnodeAddress({ address: signer })]: sig,
-                    },
-                  });
-                })
-                .catch(console.error)
+              signMessageAsync({ message })
+                .then(onSigned)
                 .finally(() => setSigning(false));
             }}
           >

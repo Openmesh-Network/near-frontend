@@ -82,16 +82,6 @@ export default function HardwareReset({
               "X-API-KEY": debouncedApiKey,
             },
           });
-        } else if (provider === "Vultr") {
-          await axios.get("/api/vultr/rewrite", {
-            params: {
-              path: "v2/users",
-              method: "GET",
-            },
-            headers: {
-              Authorization: `Bearer ${debouncedApiKey}`,
-            },
-          });
         }
         return true;
       } catch (err) {
@@ -119,7 +109,7 @@ export default function HardwareReset({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {["Hivelocity", "Vultr"].map((p, i) => (
+                {["Hivelocity"].map((p, i) => (
                   <SelectItem key={i} value={p}>
                     {p}
                   </SelectItem>

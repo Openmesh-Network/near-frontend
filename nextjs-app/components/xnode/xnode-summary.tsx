@@ -1,31 +1,56 @@
 "use client";
 
-import { Xnode } from "../context/settings";
+import { useSetSettings, useSettings, Xnode } from "../context/settings";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { AlertTriangle, CheckCircle, TriangleAlert } from "lucide-react";
-import { Button } from "../ui/button";
+import {
+  AlertTriangle,
+  CheckCircle,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
-import {
-  useCpu,
-  useDisk,
-  useMemory,
-  usePrepareXnode,
-  useSession,
-} from "@/hooks/useXnode";
 import { Bar } from "../bar";
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
+import {
+  useAuthLogin,
+  useUsageCpu,
+  useUsageDisk,
+  useUsageMemory,
+} from "@openmesh-network/xnode-manager-sdk-react";
+import { usePrepareXnode } from "@/hooks/useXnode";
+import { getBaseUrl } from "@/lib/xnode";
+import { Button } from "../ui/button";
 
 export function XnodeSummary({ xnode }: { xnode: Xnode }) {
-  const { data: session } = useSession({ xnode });
-  const { data: cpu } = useCpu({ session });
-  const { data: memory } = useMemory({ session });
-  const { data: disk } = useDisk({ session });
+  const { data: session } = useAuthLogin({
+    baseUrl: getBaseUrl({ xnode }),
+    ...xnode.loginArgs,
+  });
+
+  const settings = useSettings();
+  const setSettings = useSetSettings();
+
+  const { data: cpu } = useUsageCpu({
+    session,
+    scope: "host",
+    overrides: { refetchInterval: 10_000 },
+  });
+  const { data: memory } = useUsageMemory({
+    session,
+    scope: "host",
+    overrides: { refetchInterval: 10_000 },
+  });
+  const { data: disk } = useUsageDisk({
+    session,
+    scope: "host",
+    overrides: { refetchInterval: 10_000 },
+  });
   const { ready } = usePrepareXnode({ session });
 
   const [connectingDots, setConnectingDots] = useState(1);
@@ -38,7 +63,25 @@ export function XnodeSummary({ xnode }: { xnode: Xnode }) {
   return (
     <Card className="gap-0 bg-[#0c2246d6] text-white">
       <CardHeader>
-        <CardTitle className="text-xl">{xnode.domain}</CardTitle>
+        <CardTitle className="text-xl">
+          <div className="flex place-items-center">
+            <span className="break-all">{xnode.secure ?? xnode.insecure}</span>
+            <div className="grow" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.preventDefault();
+                setSettings({
+                  ...settings,
+                  xnodes: settings.xnodes.filter((x) => x !== xnode),
+                });
+              }}
+            >
+              <Trash2 className="text-red-600" />
+            </Button>
+          </div>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-3">

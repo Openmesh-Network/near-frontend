@@ -2,6 +2,7 @@ import { Section } from "@/components/text";
 import { DeployXnode } from "@/components/xnode/deploy-xnode";
 import { ImportXnode } from "@/components/xnode/import-xnode";
 import { MyXnodes } from "@/components/xnode/my-xnodes";
+import { ResetXnode } from "@/components/xnode/reset-xnode";
 import { Cpu } from "lucide-react";
 import Link from "next/link";
 import React from "react";
@@ -15,6 +16,8 @@ export default function IndexPage() {
             <DeployXnode />
             <span>or</span>
             <ImportXnode />
+            <span>or</span>
+            <ResetXnode />
           </div>
           <MyXnodes />
         </div>
