@@ -48,7 +48,9 @@ export function ImportXnode() {
                 id="xnode-domain"
                 placeholder="xnode.example.com"
                 value={domain}
-                onChange={(e) => setDomain(e.target.value)}
+                onChange={(e) =>
+                  setDomain(e.target.value.replace("https://", ""))
+                }
               />
             </div>
           </DialogHeader>

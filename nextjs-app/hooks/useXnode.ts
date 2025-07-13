@@ -14,6 +14,7 @@ import {
   useFileRemoveFile,
   useOsGet,
   useOsSet,
+  useProcessExecute,
 } from "@openmesh-network/xnode-manager-sdk-react";
 
 export function usePrepareXnode({
@@ -493,9 +494,32 @@ export function usePrepareXnode({
         poolVersion: existingNearContainerSettings.poolVersion,
         pinger: existingNearContainerSettings.pinger,
         update: true,
-      }).catch(console.error);
+      });
     },
     [session, containerId, createNearContainer, existingNearContainerSettings]
+  );
+
+  const { mutateAsync: execute } = useProcessExecute();
+  const restartNearContainer = useMemo(
+    () => async () => {
+      if (!session) {
+        return;
+      }
+
+      return execute({
+        session,
+        path: {
+          scope: `container:${containerId}`,
+          process: "near-validator.service",
+        },
+        data: "Restart",
+      })
+        .then((request) =>
+          awaitRequest({ request: { session, path: request } })
+        )
+        .catch(console.error);
+    },
+    [session, containerId]
   );
 
   const missingDependencies = [
@@ -528,6 +552,7 @@ export function usePrepareXnode({
     removeNearContainer,
     nearContainerUpdateNeeded,
     updateNearContainer,
+    restartNearContainer,
     ready,
     validatorPublicKey,
     pingerAccountId,

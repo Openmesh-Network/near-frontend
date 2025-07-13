@@ -150,6 +150,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     removeNearContainer,
     nearContainerUpdateNeeded,
     updateNearContainer,
+    restartNearContainer,
     validatorPublicKey,
     pingerAccountId,
   } = usePrepareXnode({ session });
@@ -440,7 +441,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     id="xnode-domain"
                     className="min-w-40"
                     value={xnodeDomain}
-                    onChange={(e) => setXnodeDomain(e.target.value)}
+                    onChange={(e) =>
+                      setXnodeDomain(e.target.value.replace("https://", ""))
+                    }
                   />
                 </div>
                 <div className="flex gap-2">
@@ -1035,6 +1038,23 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
             </SectionCard>
           )}
           <SectionCard title="Actions">
+            <Button
+              className="max-w-48"
+              onClick={() => {
+                setConfirmAction({
+                  name: "Restart NEAR app",
+                  description:
+                    "This will restart the near validator application, this will result in downtime while the application is restarting.",
+                  execute: () => {
+                    setBusy(true);
+                    restartNearContainer().finally(() => setBusy(false));
+                  },
+                });
+              }}
+              disabled={!validatorLogs || busy}
+            >
+              Restart NEAR app
+            </Button>
             <Button
               className="max-w-48"
               onClick={() => {
