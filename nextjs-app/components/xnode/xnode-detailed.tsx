@@ -203,7 +203,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
       const connectionConfig = {
         networkId: "mainnet",
         keyStore: new keyStores.BrowserLocalStorageKeyStore(),
-        nodeUrl: "https://rpc.mainnet.near.org",
+        nodeUrl: "https://rpc.mainnet.fastnear.com",
       };
       return await connect(connectionConfig);
     },
@@ -373,7 +373,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
 
       const stats = await axios
         .post(
-          "https://rpc.mainnet.near.org/",
+          "https://rpc.mainnet.fastnear.com/",
           {
             jsonrpc: "2.0",
             method: "validators",
