@@ -16,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
-import { Hourglass } from "lucide-react";
+import { Hourglass, Trash2 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { useSignMessage } from "wagmi";
@@ -61,7 +61,26 @@ export function MigrateXnodes() {
                 .map((xnode, i) => (
                   <Card key={i} className="bg-[#0c2246d6] text-white">
                     <CardHeader>
-                      <CardTitle className="text-xl">{xnode.domain}</CardTitle>
+                      <CardTitle className="text-xl">
+                        <div className="flex place-items-center">
+                          <span className="break-all">{xnode.domain}</span>
+                          <div className="grow" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSettings({
+                                ...settings,
+                                xnodes: settings.xnodes.filter(
+                                  (x) => x !== (xnode as any)
+                                ),
+                              });
+                            }}
+                          >
+                            <Trash2 className="text-red-600" />
+                          </Button>
+                        </div>
+                      </CardTitle>
                     </CardHeader>
                     <CardFooter>
                       <Button
