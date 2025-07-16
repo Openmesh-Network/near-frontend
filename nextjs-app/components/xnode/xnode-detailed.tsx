@@ -429,7 +429,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   return (
     <>
       <div className="flex flex-col gap-5">
-        {xnode?.insecure && (
+        {xnode && !xnode.secure && (
           <Alert className="bg-[#0c2246d6] text-white">
             <AlertTriangle />
             <AlertTitle>WARNING: Using unencrypted communication!</AlertTitle>
