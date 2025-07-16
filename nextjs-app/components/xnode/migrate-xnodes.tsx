@@ -9,6 +9,14 @@ import { Card, CardFooter, CardHeader, CardTitle } from "../ui/card";
 import { LoginXnode, LoginXnodeParams } from "./login";
 import axios from "axios";
 import { parseSignature, toBytes } from "viem";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import { Hourglass } from "lucide-react";
 
 export function MigrateXnodes() {
   const address = useAddress();
@@ -25,6 +33,7 @@ export function MigrateXnodes() {
   }, [address, settings.xnodes]);
 
   const [login, setLogin] = useState<LoginXnodeParams | undefined>(undefined);
+  const [busy, setBusy] = useState<boolean>(false);
 
   return (
     <>
@@ -58,6 +67,9 @@ export function MigrateXnodes() {
                           message: `Xnode Auth authenticate ${messageDomain} at ${messageTimestamp}`,
                           onSigned(signature) {
                             const migrate = async () => {
+                              setLogin(undefined);
+                              setBusy(true);
+
                               const axiosInstance = axios.create({
                                 // httpsAgent: new https.Agent({ rejectUnauthorized: false }), // Allow self-signed certificates (for "recovery mode", no secrets should be shared from the client)
                                 withCredentials: true, // Store cookies
@@ -446,11 +458,11 @@ export function MigrateXnodes() {
                                   (x as any) === xnode ? migratedXnode : x
                                 ),
                               });
-
-                              setLogin(undefined);
                             };
 
-                            migrate().catch(console.error);
+                            migrate()
+                              .catch(console.error)
+                              .finally(() => setBusy(false));
                           },
                           onCancel() {
                             setLogin(undefined);
@@ -476,6 +488,17 @@ export function MigrateXnodes() {
         )}
       </div>
       {login && <LoginXnode {...login} />}
+      <AlertDialog open={busy}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Performing action...</AlertDialogTitle>
+            <AlertDialogDescription className="flex gap-1 place-items-center">
+              <Hourglass />
+              <span>Please wait. Do not refresh the page.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
