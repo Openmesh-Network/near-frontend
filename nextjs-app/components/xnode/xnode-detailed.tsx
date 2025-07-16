@@ -301,10 +301,19 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           ).replaceAll('"', ""),
           reward_fee_fraction: JSON.parse(
             String.fromCharCode(...responses[2].result)
-          ),
+          ) as { numerator: number; denominator: number },
         };
       },
     });
+
+  useEffect(() => {
+    if (!deployedPoolSettings) {
+      return;
+    }
+
+    setRewardFee(deployedPoolSettings.reward_fee_fraction.numerator);
+  }, [deployedPoolSettings?.reward_fee_fraction.numerator]);
+
   const { data: totalPoolStake, refetch: refetchTotalPoolStake } = useQuery({
     queryKey: ["totalPoolStake", near ?? "", poolDeployed ?? false, fullPoolId],
     enabled: !!near && poolDeployed,
