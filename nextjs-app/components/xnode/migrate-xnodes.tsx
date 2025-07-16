@@ -164,6 +164,7 @@ export function MigrateXnodes() {
             { pkgs, ... }:
             {
               boot.loader.timeout = 0; # Speed up boot by skipping selection
+              zramSwap.enable = true; # Compress memory
 
               environment.systemPackages = [
                 pkgs.mergerfs
