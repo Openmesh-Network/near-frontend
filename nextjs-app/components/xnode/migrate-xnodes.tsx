@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useSetSettings, useSettings, Xnode } from "../context/settings";
-import { useAddress } from "@/hooks/useAddress";
+import { toXnodeAddress, useAddress } from "@/hooks/useAddress";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Card, CardFooter, CardHeader, CardTitle } from "../ui/card";
 import { LoginXnode, LoginXnodeParams } from "./login";
 import axios from "axios";
-import { parseSignature, toBytes } from "viem";
+import { parseSignature, recoverMessageAddress, toBytes } from "viem";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -17,6 +17,10 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { Hourglass } from "lucide-react";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { useSignMessage } from "wagmi";
+import { toast } from "sonner";
 
 export function MigrateXnodes() {
   const address = useAddress();
@@ -35,68 +39,74 @@ export function MigrateXnodes() {
   const [login, setLogin] = useState<LoginXnodeParams | undefined>(undefined);
   const [busy, setBusy] = useState<boolean>(false);
 
+  const [domain, setDomain] = useState<string>("");
+  const { signMessageAsync } = useSignMessage();
+
   return (
     <>
-      <div className="@container">
-        {myXnodes.length > 0 ? (
-          <div className="grid gap-3 grid-cols-4 @max-lg:grid-cols-1 @max-3xl:grid-cols-2 @max-6xl:grid-cols-3">
-            {myXnodes
-              .map(
-                (xnode) =>
-                  xnode as any as {
-                    domain: string;
-                    owner: string;
-                    insecure: boolean;
-                    deploymentAuth?: string;
-                  }
-              )
-              .map((xnode, i) => (
-                <Card key={i} className="bg-[#0c2246d6] text-white">
-                  <CardHeader>
-                    <CardTitle className="text-xl">{xnode.domain}</CardTitle>
-                  </CardHeader>
-                  <CardFooter>
-                    <Button
-                      onClick={() => {
-                        const messageDomain = xnode.insecure
-                          ? "manager.xnode.local"
-                          : xnode.domain;
-                        const messageTimestamp = Math.round(Date.now() / 1000);
+      <div className="flex flex-col gap-2">
+        <div className="@container">
+          {myXnodes.length > 0 ? (
+            <div className="grid gap-3 grid-cols-4 @max-lg:grid-cols-1 @max-3xl:grid-cols-2 @max-6xl:grid-cols-3">
+              {myXnodes
+                .map(
+                  (xnode) =>
+                    xnode as any as {
+                      domain: string;
+                      owner: string;
+                      insecure: boolean;
+                      deploymentAuth?: string;
+                    }
+                )
+                .map((xnode, i) => (
+                  <Card key={i} className="bg-[#0c2246d6] text-white">
+                    <CardHeader>
+                      <CardTitle className="text-xl">{xnode.domain}</CardTitle>
+                    </CardHeader>
+                    <CardFooter>
+                      <Button
+                        onClick={() => {
+                          const messageDomain = xnode.insecure
+                            ? "manager.xnode.local"
+                            : xnode.domain;
+                          const messageTimestamp = Math.round(
+                            Date.now() / 1000
+                          );
 
-                        setLogin({
-                          message: `Xnode Auth authenticate ${messageDomain} at ${messageTimestamp}`,
-                          onSigned(signature) {
-                            const migrate = async () => {
-                              setLogin(undefined);
-                              setBusy(true);
+                          setLogin({
+                            message: `Xnode Auth authenticate ${messageDomain} at ${messageTimestamp}`,
+                            onSigned(signature) {
+                              const migrate = async () => {
+                                setLogin(undefined);
+                                setBusy(true);
 
-                              const axiosInstance = axios.create({
-                                // httpsAgent: new https.Agent({ rejectUnauthorized: false }), // Allow self-signed certificates (for "recovery mode", no secrets should be shared from the client)
-                                withCredentials: true, // Store cookies
-                              });
-                              const prefix = xnode.insecure
-                                ? "xnode-forward-insecure"
-                                : "xnode-forward";
-                              const baseUrl = `/${prefix}/${xnode.domain}`;
+                                const axiosInstance = axios.create({
+                                  // httpsAgent: new https.Agent({ rejectUnauthorized: false }), // Allow self-signed certificates (for "recovery mode", no secrets should be shared from the client)
+                                  withCredentials: true, // Store cookies
+                                });
+                                const prefix = xnode.insecure
+                                  ? "xnode-forward-insecure"
+                                  : "xnode-forward";
+                                const baseUrl = `/${prefix}/${xnode.domain}`;
 
-                              const legacySignature = parseSignature(
-                                (settings as any).wallets[xnode.owner]
-                              );
-                              await axiosInstance.post(
-                                `${baseUrl}/auth/login`,
-                                {
-                                  login_method: {
-                                    WalletSignature: {
-                                      v: legacySignature.yParity,
-                                      r: [...toBytes(legacySignature.r)],
-                                      s: [...toBytes(legacySignature.s)],
+                                const legacySignature = parseSignature(
+                                  (settings as any).wallets[xnode.owner]
+                                );
+                                await axiosInstance.post(
+                                  `${baseUrl}/auth/login`,
+                                  {
+                                    login_method: {
+                                      WalletSignature: {
+                                        v: legacySignature.yParity,
+                                        r: [...toBytes(legacySignature.r)],
+                                        s: [...toBytes(legacySignature.s)],
+                                      },
                                     },
-                                  },
-                                }
-                              );
+                                  }
+                                );
 
-                              await axiosInstance.post(`${baseUrl}/os/set`, {
-                                flake: `{
+                                await axiosInstance.post(`${baseUrl}/os/set`, {
+                                  flake: `{
   description = "XnodeOS Configuration";
 
   inputs = {
@@ -433,59 +443,108 @@ export function MigrateXnodes() {
       };
     };
 }`,
-                                update_inputs: [],
-                                as_child: true,
-                              });
+                                  update_inputs: [],
+                                  as_child: true,
+                                });
 
-                              const migratedXnode = {
-                                owner: address,
-                                secure: !xnode.insecure
-                                  ? xnode.domain
-                                  : undefined,
-                                insecure: xnode.insecure
-                                  ? xnode.domain
-                                  : undefined,
-                                loginArgs: {
-                                  user: address,
-                                  signature,
-                                  timestamp: messageTimestamp.toString(),
-                                },
-                              } as Xnode;
+                                const migratedXnode = {
+                                  owner: address,
+                                  secure: !xnode.insecure
+                                    ? xnode.domain
+                                    : undefined,
+                                  insecure: xnode.insecure
+                                    ? xnode.domain
+                                    : undefined,
+                                  loginArgs: {
+                                    user: address,
+                                    signature,
+                                    timestamp: messageTimestamp.toString(),
+                                  },
+                                } as Xnode;
 
-                              setSettings({
-                                ...settings,
-                                xnodes: settings.xnodes.map((x) =>
-                                  (x as any) === xnode ? migratedXnode : x
-                                ),
-                              });
-                            };
+                                setSettings({
+                                  ...settings,
+                                  xnodes: settings.xnodes.map((x) =>
+                                    (x as any) === xnode ? migratedXnode : x
+                                  ),
+                                });
+                              };
 
-                            migrate()
-                              .catch(console.error)
-                              .finally(() => setBusy(false));
-                          },
-                          onCancel() {
-                            setLogin(undefined);
-                          },
-                        });
-                      }}
-                    >
-                      Migrate
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
+                              migrate()
+                                .catch(console.error)
+                                .finally(() => setBusy(false));
+                            },
+                            onCancel() {
+                              setLogin(undefined);
+                            },
+                          });
+                        }}
+                      >
+                        Migrate
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+            </div>
+          ) : (
+            <Alert>
+              <AlertTitle>No Xnodes requiring migration found.</AlertTitle>
+              <AlertDescription>
+                Your Xnodes are saved in your browser cache and linked to the
+                currently connected wallet. In case you are accessing from a
+                different browser or device, please import your Xnodes.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+        <div className="flex flex-col gap-1 md:max-w-96">
+          <span>Import Node</span>
+          <div className="flex">
+            <Label htmlFor="xnode-domain">IP / Domain</Label>
+            <Input
+              id="xnode-domain"
+              className="bg-white"
+              value={domain}
+              onChange={(e) =>
+                setDomain(e.target.value.replace("https://", ""))
+              }
+            />
           </div>
-        ) : (
-          <Alert>
-            <AlertTitle>No Xnodes requiring migration found.</AlertTitle>
-            <AlertDescription>
-              Your Xnodes are saved in your browser cache and linked to the
-              currently connected wallet. In case you are accessing from a
-              different browser or device, please import your Xnodes.
-            </AlertDescription>
-          </Alert>
-        )}
+          <Button
+            onClick={() => {
+              toast("Please sign login message in your wallet.");
+              const message = "Create Xnode Manager session";
+              signMessageAsync({
+                message,
+              }).then(async (sig) => {
+                const signer = await recoverMessageAddress({
+                  message,
+                  signature: sig,
+                });
+                const insecure = /^(\d{1,3}\.){3}\d{1,3}$/.test(domain);
+                setSettings({
+                  ...settings,
+                  xnodes: [
+                    ...settings.xnodes,
+                    {
+                      domain,
+                      insecure,
+                      owner: address,
+                    },
+                  ],
+                  wallets: {
+                    ...(settings as any).wallets,
+                    [toXnodeAddress({ address: signer })]: sig,
+                  },
+                } as any);
+                setDomain("");
+              });
+            }}
+            disabled={!address}
+          >
+            Import
+          </Button>
+        </div>
       </div>
       {login && <LoginXnode {...login} />}
       <AlertDialog open={busy}>
