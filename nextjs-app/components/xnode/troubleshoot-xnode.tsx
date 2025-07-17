@@ -46,7 +46,9 @@ export function TroubleshootXnode() {
         <Input
           id="xnode-domain"
           value={domain}
-          onChange={(e) => setDomain(e.target.value.replace("https://", ""))}
+          onChange={(e) =>
+            setDomain(e.target.value.replace("https://", "").trim())
+          }
         />
       </div>
       <Button

@@ -48,7 +48,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import HardwareReset from "../deployment/hardware-reset";
 import Image from "next/image";
 import NearLogo from "@/public/images/near/near.svg";
 import {
@@ -67,6 +66,7 @@ import {
   useUsageMemory,
 } from "@openmesh-network/xnode-manager-sdk-react";
 import { usePrepareXnode } from "@/hooks/useXnode";
+import { LoginXnode, LoginXnodeParams } from "./login";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
   const searchParams = useSearchParams();
@@ -426,6 +426,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     { name: string; description: string; execute: () => void } | undefined
   >(undefined);
 
+  const [login, setLogin] = useState<LoginXnodeParams | undefined>(undefined);
+
   return (
     <>
       <div className="flex flex-col gap-5">
@@ -451,7 +453,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     className="min-w-40"
                     value={xnodeDomain}
                     onChange={(e) =>
-                      setXnodeDomain(e.target.value.replace("https://", ""))
+                      setXnodeDomain(
+                        e.target.value.replace("https://", "").trim()
+                      )
                     }
                   />
                 </div>
@@ -461,38 +465,53 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     id="acme-email"
                     className="min-w-40"
                     value={acmeEmail}
-                    onChange={(e) => setAcmeEmail(e.target.value)}
+                    onChange={(e) => setAcmeEmail(e.target.value.trim())}
                   />
                 </div>
                 <Button
                   onClick={() => {
-                    setBusy(true);
-                    enableHttps({
-                      domain: xnodeDomain,
-                      acme_email: acmeEmail,
-                    })
-                      .then(() => {
-                        const newXnode = {
-                          ...xnode,
-                          secure: xnodeDomain,
-                        };
-                        setSettings({
-                          ...settings,
-                          xnodes: settings.xnodes.map((x) => {
-                            if (x === xnode) {
-                              return newXnode;
-                            }
+                    const messageTimestamp = Math.round(Date.now() / 1000);
+                    setLogin({
+                      message: `Xnode Auth authenticate ${xnodeDomain} at ${messageTimestamp}`,
+                      onSigned(signature) {
+                        setLogin(undefined);
+                        setBusy(true);
+                        enableHttps({
+                          domain: xnodeDomain,
+                          acme_email: acmeEmail,
+                        })
+                          .then(() => {
+                            const newXnode = {
+                              ...xnode,
+                              secure: xnodeDomain,
+                              loginArgs: {
+                                ...xnode.loginArgs,
+                                signature,
+                                timestamp: messageTimestamp.toString(),
+                              },
+                            };
+                            setSettings({
+                              ...settings,
+                              xnodes: settings.xnodes.map((x) => {
+                                if (x === xnode) {
+                                  return newXnode;
+                                }
 
-                            return x;
-                          }),
-                        });
-                        push(
-                          `/xnode?baseUrl=${getBaseUrl({
-                            xnode: newXnode,
-                          })}`
-                        );
-                      })
-                      .finally(() => setBusy(false));
+                                return x;
+                              }),
+                            });
+                            push(
+                              `/xnode?baseUrl=${getBaseUrl({
+                                xnode: newXnode,
+                              })}`
+                            );
+                          })
+                          .finally(() => setBusy(false));
+                      },
+                      onCancel() {
+                        setLogin(undefined);
+                      },
+                    });
                   }}
                   disabled={busy}
                 >
@@ -1224,6 +1243,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           </AlertDialogHeader>
         </AlertDialogContent>
       </AlertDialog>
+      {login && <LoginXnode {...login} />}
     </>
   );
 }

@@ -525,7 +525,7 @@ export function MigrateXnodes() {
               className="bg-white"
               value={domain}
               onChange={(e) =>
-                setDomain(e.target.value.replace("https://", ""))
+                setDomain(e.target.value.replace("https://", "").trim())
               }
             />
           </div>
