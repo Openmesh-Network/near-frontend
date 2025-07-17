@@ -36,7 +36,7 @@
     "@near-wallet-selector/wallet-connect": "^9.0.1",
     "@near-wallet-selector/welldone-wallet": "^9.0.1",
     "@near-wallet-selector/xdefi": "^9.0.1",
-    "@openmesh-network/xnode-manager-sdk": "^1.0.6",
+    "@openmesh-network/xnode-manager-sdk": "^1.0.7",
     "@openmesh-network/xnode-manager-sdk-react": "^1.0.12",
     "@radix-ui/react-alert-dialog": "^1.1.13",
     "@radix-ui/react-checkbox": "^1.3.1",
