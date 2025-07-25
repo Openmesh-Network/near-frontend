@@ -95,38 +95,6 @@ export function usePrepareXnode({
     [session, osConfig, latestOsConfig]
   );
 
-  const enableHttps = useMemo(
-    () =>
-      async ({
-        domain,
-        acme_email,
-      }: {
-        domain: string;
-        acme_email: string;
-      }) => {
-        if (!session) {
-          return;
-        }
-
-        return setOS({
-          session,
-          data: {
-            acme_email,
-            domain,
-            flake: null,
-            update_inputs: null,
-            user_passwd: null,
-            xnode_owner: null,
-          },
-        })
-          .then((request) =>
-            awaitRequest({ request: { session, path: request } })
-          )
-          .catch(console.error);
-      },
-    [session]
-  );
-
   // Important to keep the newline before and after!
   const wantedOsUserConfig = `
 {
@@ -539,7 +507,6 @@ export function usePrepareXnode({
     os,
     osUpdateNeeded,
     osUpdate,
-    enableHttps,
     osPatchNeeded,
     osPatch,
     xnodeManagerUpdateNeeded,

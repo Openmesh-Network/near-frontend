@@ -8,12 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import {
-  AlertTriangle,
-  CheckCircle,
-  Hourglass,
-  TriangleAlert,
-} from "lucide-react";
+import { CheckCircle, Hourglass, TriangleAlert } from "lucide-react";
 import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { UsageChart, UsageHistory } from "../charts/usage-chart";
 import { Section, Title } from "../text";
@@ -37,7 +32,6 @@ import { ScrollArea } from "../ui/scroll-area";
 import { formatUnits, parseUnits } from "viem";
 import { Ansi } from "../ansi";
 import axios from "axios";
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Dialog,
@@ -66,14 +60,13 @@ import {
   useUsageMemory,
 } from "@openmesh-network/xnode-manager-sdk-react";
 import { usePrepareXnode } from "@/hooks/useXnode";
-import { LoginXnode, LoginXnodeParams } from "./login";
+import { SubdomainClaimer } from "./subdomain-claimer";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
   const searchParams = useSearchParams();
   const baseUrl = useMemo(() => searchParams.get("baseUrl"), [searchParams]);
 
   const settings = useSettings();
-  const setSettings = useSetSettings();
   const xnode = useMemo(
     () => settings.xnodes.find((x) => getBaseUrl({ xnode: x }) === baseUrl),
     [settings.xnodes, baseUrl]
@@ -93,10 +86,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   });
 
   const [busy, setBusy] = useState<boolean>(false);
-
-  const [xnodeDomain, setXnodeDomain] = useState<string>("");
-  const [acmeEmail, setAcmeEmail] = useState<string>("");
-  const { push } = useRouter();
 
   const { data: cpu, dataUpdatedAt: cpuUpdatedAt } = useUsageCpu({
     session,
@@ -137,7 +126,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const {
     osUpdateNeeded,
     osUpdate,
-    enableHttps,
     osPatchNeeded,
     osPatch,
     xnodeManagerUpdateNeeded,
@@ -426,101 +414,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     { name: string; description: string; execute: () => void } | undefined
   >(undefined);
 
-  const [login, setLogin] = useState<LoginXnodeParams | undefined>(undefined);
-
   return (
     <>
       <div className="flex flex-col gap-5">
-        {xnode && !xnode.secure && (
-          <Alert className="bg-[#0c2246d6] text-white">
-            <AlertTriangle />
-            <AlertTitle>WARNING: Using unencrypted communication!</AlertTitle>
-            <AlertDescription className="text-muted">
-              <span>
-                You should enable HTTPS before accessing any confidential
-                information on your Xnode (such as validator private keys).
-                Setup an A record pointing to this Xnode IP address ({domain}),
-                it can be under any (sub)domain. Only press the update button
-                once the record has been set and has propagated, otherwise you
-                might become locked out of your Xnode. Email is required and
-                cannot be from a blacklisted domain (e.g. @example.com).
-              </span>
-              <div className="pt-1 flex gap-2 flex-wrap">
-                <div className="flex gap-2">
-                  <Label htmlFor="xnode-domain">Domain</Label>
-                  <Input
-                    id="xnode-domain"
-                    className="min-w-40"
-                    value={xnodeDomain}
-                    onChange={(e) =>
-                      setXnodeDomain(
-                        e.target.value.replace("https://", "").trim()
-                      )
-                    }
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Label htmlFor="xnode-domain">ACME Email</Label>
-                  <Input
-                    id="acme-email"
-                    className="min-w-40"
-                    value={acmeEmail}
-                    onChange={(e) => setAcmeEmail(e.target.value.trim())}
-                  />
-                </div>
-                <Button
-                  onClick={() => {
-                    const messageTimestamp = Math.round(Date.now() / 1000);
-                    setLogin({
-                      message: `Xnode Auth authenticate ${xnodeDomain} at ${messageTimestamp}`,
-                      onSigned(signature) {
-                        setLogin(undefined);
-                        setBusy(true);
-                        enableHttps({
-                          domain: xnodeDomain,
-                          acme_email: acmeEmail,
-                        })
-                          .then(() => {
-                            const newXnode = {
-                              ...xnode,
-                              secure: xnodeDomain,
-                              loginArgs: {
-                                ...xnode.loginArgs,
-                                signature,
-                                timestamp: messageTimestamp.toString(),
-                              },
-                            };
-                            setSettings({
-                              ...settings,
-                              xnodes: settings.xnodes.map((x) => {
-                                if (x === xnode) {
-                                  return newXnode;
-                                }
-
-                                return x;
-                              }),
-                            });
-                            push(
-                              `/xnode?baseUrl=${getBaseUrl({
-                                xnode: newXnode,
-                              })}`
-                            );
-                          })
-                          .finally(() => setBusy(false));
-                      },
-                      onCancel() {
-                        setLogin(undefined);
-                      },
-                    });
-                  }}
-                  disabled={busy}
-                >
-                  Update
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
+        <SubdomainClaimer session={session} xnode={xnode} setBusy={setBusy} />
         <Section title="Monitor NEAR Node">
           <div className="grid grid-cols-3 gap-2 max-lg:grid-cols-2 max-md:grid-cols-1">
             {cpuHistory.length > 0 && (
@@ -1243,7 +1140,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           </AlertDialogHeader>
         </AlertDialogContent>
       </AlertDialog>
-      {login && <LoginXnode {...login} />}
     </>
   );
 }
