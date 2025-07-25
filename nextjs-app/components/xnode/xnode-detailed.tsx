@@ -267,16 +267,20 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           return undefined;
         }
 
+        const upgradablePool = fullPoolId.endsWith("near.pool");
         const responses = await Promise.all(
-          ["get_owner_id", "get_staking_key", "get_reward_fee_fraction"].map(
-            (method_name) =>
-              near.connection.provider.query<CodeResult>({
-                request_type: "call_function",
-                finality: "final",
-                account_id: fullPoolId,
-                method_name,
-                args_base64: "",
-              })
+          [
+            "get_owner_id",
+            "get_staking_key",
+            upgradablePool ? "get_pool_summary" : "get_reward_fee_fraction",
+          ].map((method_name) =>
+            near.connection.provider.query<CodeResult>({
+              request_type: "call_function",
+              finality: "final",
+              account_id: fullPoolId,
+              method_name,
+              args_base64: "",
+            })
           )
         );
         return {
@@ -287,9 +291,19 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           stake_public_key: String.fromCharCode(
             ...responses[1].result
           ).replaceAll('"', ""),
-          reward_fee_fraction: JSON.parse(
-            String.fromCharCode(...responses[2].result)
-          ) as { numerator: number; denominator: number },
+          reward_fee_fraction: upgradablePool
+            ? (
+                JSON.parse(String.fromCharCode(...responses[2].result)) as {
+                  next_reward_fee_fraction: {
+                    numerator: number;
+                    denominator: number;
+                  };
+                }
+              ).next_reward_fee_fraction
+            : (JSON.parse(String.fromCharCode(...responses[2].result)) as {
+                numerator: number;
+                denominator: number;
+              }),
         };
       },
     });
