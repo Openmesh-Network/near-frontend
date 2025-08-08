@@ -12,6 +12,7 @@ import {
   useFileReadFile,
   useFileRemoveDirectory,
   useFileRemoveFile,
+  useInfoFlake,
   useOsGet,
   useOsSet,
   useProcessExecute,
@@ -24,80 +25,8 @@ export function usePrepareXnode({
 }) {
   const { data: os } = useOsGet({ session });
 
-  const { data: latestOsConfig } = useQuery({
-    queryKey: ["latest-os-config"],
-    queryFn: async () => {
-      return await axios
-        .get(
-          "https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/flake.nix"
-        )
-        .then((res) => res.data)
-        .then((data) => {
-          const startSplit = data.split("# START USER CONFIG");
-          const endSplit = startSplit[1].split("# END USER CONFIG");
-          return {
-            beforeUserConfig: startSplit[0],
-            afterUserConfig: endSplit[1],
-          };
-        });
-    },
-  });
-  const osConfig = useMemo(() => {
-    if (!os) {
-      return undefined;
-    }
-
-    const startSplit = os.flake.split("# START USER CONFIG");
-    const endSplit = startSplit[1].split("# END USER CONFIG");
-    return {
-      beforeUserConfig: startSplit[0],
-      userConfig: endSplit[0],
-      afterUserConfig: endSplit[1],
-    };
-  }, [os]);
-
-  const osUpdateNeeded = useMemo(
-    () =>
-      osConfig && latestOsConfig
-        ? osConfig.beforeUserConfig !== latestOsConfig.beforeUserConfig ||
-          osConfig.afterUserConfig !== latestOsConfig.afterUserConfig
-        : undefined,
-    [osConfig, latestOsConfig]
-  );
-  const { mutateAsync: setOS } = useOsSet();
-  const osUpdate = useMemo(
-    () => async () => {
-      if (!session || !osConfig || !latestOsConfig) {
-        return;
-      }
-
-      return setOS({
-        session,
-        data: {
-          acme_email: null,
-          domain: null,
-          flake:
-            latestOsConfig.beforeUserConfig +
-            "# START USER CONFIG" +
-            osConfig.userConfig +
-            "# END USER CONFIG" +
-            latestOsConfig.afterUserConfig,
-          update_inputs: null,
-          user_passwd: null,
-          xnode_owner: null,
-        },
-      })
-        .then((request) =>
-          awaitRequest({ request: { session, path: request } })
-        )
-        .catch(console.error);
-    },
-    [session, osConfig, latestOsConfig]
-  );
-
   // Important to keep the newline before and after!
   const wantedOsUserConfig = `
-{
   boot.kernel.sysctl = {
     "net.core.rmem_max" = 8388608;
     "net.core.wmem_max" = 8388608;
@@ -110,66 +39,41 @@ export function usePrepareXnode({
     3030
     24567
   ];
-}
 `;
-
-  const osPatchNeeded = useMemo(
-    () => (osConfig ? osConfig.userConfig !== wantedOsUserConfig : undefined),
-    [osConfig, wantedOsUserConfig]
-  );
-  const osPatch = useMemo(
-    () => async () => {
-      if (!session || !osConfig) {
-        return;
-      }
-
-      return setOS({
-        session,
-        data: {
-          acme_email: null,
-          domain: null,
-          flake:
-            osConfig.beforeUserConfig +
-            "# START USER CONFIG" +
-            wantedOsUserConfig +
-            "# END USER CONFIG" +
-            osConfig.afterUserConfig,
-          update_inputs: null,
-          user_passwd: null,
-          xnode_owner: null,
-        },
-      })
-        .then((request) =>
-          awaitRequest({ request: { session, path: request } })
-        )
-        .catch(console.error);
-    },
-    [session, osConfig, wantedOsUserConfig]
-  );
-
-  const { data: latestXnodeManagerVersion } = useQuery({
-    queryKey: ["latest-xnode-manager"],
+  const { data: latestOsConfig } = useQuery({
+    queryKey: ["latest-os-config"],
     queryFn: async () => {
       return await axios
         .get(
-          "/github-forward/repos/Openmesh-Network/xnode-manager/commits/main"
+          "https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/flake.nix"
         )
-        .then((res) => res.data)
-        .then((data) => data.sha);
+        .then((res) => res.data as string)
+        .then((data) => {
+          const startSplit = data.split("# START USER CONFIG");
+          const endSplit = startSplit[1].split("# END USER CONFIG");
+          return `${startSplit[0]}# START USER CONFIG${wantedOsUserConfig}# END USER CONFIG${endSplit[1]}`;
+        });
     },
   });
-  const xnodeManagerUpdateNeeded = useMemo(() => {
-    if (!os || !latestXnodeManagerVersion) {
-      return undefined;
-    }
 
-    const version = JSON.parse(os.flake_lock).nodes["xnode-manager"].locked.rev;
-    return version !== latestXnodeManagerVersion;
-  }, [os, latestXnodeManagerVersion]);
+  const { data: latestXnodeManager } = useInfoFlake({
+    session,
+    flake: "github:Openmesh-Network/xnode-manager",
+  });
 
-  const xnodeManagerUpdate = useMemo(
+  const osUpdateNeeded = useMemo(
+    () =>
+      os && latestOsConfig && latestXnodeManager
+        ? os.flake !== latestOsConfig ||
+          latestXnodeManager.revision !==
+            JSON.parse(os.flake_lock).nodes["xnode-manager"].locked.rev
+        : undefined,
+    [os, latestOsConfig, latestXnodeManager]
+  );
+  const { mutateAsync: setOS } = useOsSet();
+  const osUpdate = useMemo(
     () => async () => {
-      if (!session) {
+      if (!session || !latestOsConfig) {
         return;
       }
 
@@ -178,8 +82,8 @@ export function usePrepareXnode({
         data: {
           acme_email: null,
           domain: null,
-          flake: null,
-          update_inputs: ["xnode-manager"],
+          flake: latestOsConfig,
+          update_inputs: [],
           user_passwd: null,
           xnode_owner: null,
         },
@@ -189,7 +93,7 @@ export function usePrepareXnode({
         )
         .catch(console.error);
     },
-    [session]
+    [session, latestOsConfig]
   );
 
   const { data: containers } = useConfigContainers({ session });
@@ -492,8 +396,6 @@ export function usePrepareXnode({
 
   const missingDependencies = [
     osUpdateNeeded,
-    osPatchNeeded,
-    xnodeManagerUpdateNeeded,
     nearContainerMissing,
     nearContainerUpdateNeeded,
   ];
@@ -507,10 +409,6 @@ export function usePrepareXnode({
     os,
     osUpdateNeeded,
     osUpdate,
-    osPatchNeeded,
-    osPatch,
-    xnodeManagerUpdateNeeded,
-    xnodeManagerUpdate,
     containerId: nearContainerMissing ? undefined : containerId,
     nearContainerMissing,
     createNearContainer,

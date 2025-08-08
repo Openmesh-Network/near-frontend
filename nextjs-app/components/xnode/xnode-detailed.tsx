@@ -126,10 +126,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const {
     osUpdateNeeded,
     osUpdate,
-    osPatchNeeded,
-    osPatch,
-    xnodeManagerUpdateNeeded,
-    xnodeManagerUpdate,
     containerId,
     nearContainerMissing,
     createNearContainer,
@@ -540,25 +536,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   <Status type="success" text="OS up to date." />
                 </RowDiv>
               ))}
-            {osPatchNeeded !== undefined &&
-              (osPatchNeeded ? (
-                <RowDiv>
-                  <Status type="warning" text="OS patch not applied." />
-                  <Button
-                    onClick={() => {
-                      setBusy(true);
-                      osPatch().finally(() => setBusy(false));
-                    }}
-                    disabled={busy}
-                  >
-                    Patch
-                  </Button>
-                </RowDiv>
-              ) : (
-                <RowDiv>
-                  <Status type="success" text="OS patched." />
-                </RowDiv>
-              ))}
             {nearContainerMissing !== undefined &&
               (nearContainerMissing ? (
                 <RowDiv>
@@ -603,25 +580,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               ) : (
                 <RowDiv>
                   <Status type="success" text="NEAR app deployed." />
-                </RowDiv>
-              ))}
-            {xnodeManagerUpdateNeeded !== undefined &&
-              (xnodeManagerUpdateNeeded ? (
-                <RowDiv>
-                  <Status type="warning" text="Xnode Manager not up to date." />
-                  <Button
-                    onClick={() => {
-                      setBusy(true);
-                      xnodeManagerUpdate().finally(() => setBusy(false));
-                    }}
-                    disabled={busy}
-                  >
-                    Update
-                  </Button>
-                </RowDiv>
-              ) : (
-                <RowDiv>
-                  <Status type="success" text="Xnode Manager up to date." />
                 </RowDiv>
               ))}
             {nearContainerUpdateNeeded !== undefined &&
