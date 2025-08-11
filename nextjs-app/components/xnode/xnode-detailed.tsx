@@ -61,6 +61,7 @@ import {
 } from "@openmesh-network/xnode-manager-sdk-react";
 import { usePrepareXnode } from "@/hooks/useXnode";
 import { SubdomainClaimer } from "./subdomain-claimer";
+import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
   const searchParams = useSearchParams();
@@ -459,6 +460,47 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                       />
                     </div>
                   ))}
+                  {disk
+                    .map((d) => {
+                      let used = d.used / d.total;
+                      if (used > 0.9) {
+                        return "critical";
+                      } else if (used > 0.85) {
+                        return "warning";
+                      } else {
+                        return undefined;
+                      }
+                    })
+                    .map((condition) => {
+                      if (condition === "critical") {
+                        return (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertTitle>NEAR Node Critical</AlertTitle>
+                            <AlertDescription>
+                              Storage usage has reached 90%. The node may stop
+                              and performance could be severely affected. Click
+                              "Delete NEAR chain data" immediately to avoid
+                              downtime. Alternatively you can opt for increasing
+                              the storage with your hardware provider.
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      } else if (condition === "warning") {
+                        return (
+                          <Alert className="mt-2">
+                            <AlertTitle>NEAR Node Warning</AlertTitle>
+                            <AlertDescription>
+                              Storage usage has reached 85%. Please click
+                              "Delete NEAR chain data" to free up space and
+                              prevent service degradation. Alternatively you can
+                              opt for increasing the storage with your hardware
+                              provider.
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      }
+                    })
+                    .at(0)}
                 </CardContent>
               </Card>
             )}
