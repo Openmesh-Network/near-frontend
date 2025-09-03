@@ -136,6 +136,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     nearContainerUpdateNeeded,
     updateNearContainer,
     restartNearContainer,
+    resetNearData,
     validatorPublicKey,
     pingerAccountId,
   } = usePrepareXnode({ session });
@@ -611,7 +612,6 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         poolId,
                         poolVersion,
                         pinger,
-                        reset: false,
                       }).finally(() => setBusy(false));
                     }}
                     disabled={!validatorLogs || !poolId || busy}
@@ -1003,12 +1003,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     "This will delete all NEAR chain data, causing the app to resync from scratch. This does not remove any private keys, however will result in down time while the node is syncing.",
                   execute: () => {
                     setBusy(true);
-                    updateNearContainerSettings({
-                      poolId,
-                      poolVersion,
-                      pinger,
-                      reset: true,
-                    }).finally(() => setBusy(false));
+                    resetNearData().finally(() => setBusy(false));
                   },
                 });
               }}

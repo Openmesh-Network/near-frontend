@@ -201,7 +201,7 @@ export function usePrepareXnode({
 }`,
               network: null,
             },
-            update_inputs: update ? ["near-validator"] : null,
+            update_inputs: update ? [] : null,
           },
         })
           .then((request) =>
@@ -275,42 +275,27 @@ export function usePrepareXnode({
         poolId,
         poolVersion,
         pinger,
-        reset,
       }: {
         poolId: string;
         poolVersion: string;
         pinger: boolean;
-        reset: boolean;
       }) => {
         if (!session || !existingNearContainerSettings) {
           return;
         }
 
         return (
-          reset
-            ? removeDirectory({
+          `${poolId}.${poolVersion}.near` !==
+          `${existingNearContainerSettings.poolId}.${existingNearContainerSettings.poolVersion}.near`
+            ? removeFile({
                 session,
                 path: { scope: `container:${containerId}` },
                 data: {
-                  path: "/var/lib/near-validator/.near/data",
-                  make_empty: true,
+                  path: "/var/lib/near-validator/.near/validator_key.json",
                 },
               }).catch(console.error)
             : new Promise((resolve) => setTimeout(resolve, 0))
-        )
-          .then(() =>
-            `${poolId}.${poolVersion}.near` !==
-            `${existingNearContainerSettings.poolId}.${existingNearContainerSettings.poolVersion}.near`
-              ? removeFile({
-                  session,
-                  path: { scope: `container:${containerId}` },
-                  data: {
-                    path: "/var/lib/near-validator/.near/validator_key.json",
-                  },
-                }).catch(console.error)
-              : new Promise((resolve) => setTimeout(resolve, 0))
-          )
-          .then(() => createNearContainer({ poolId, poolVersion, pinger }));
+        ).then(() => createNearContainer({ poolId, poolVersion, pinger }));
       },
     [session, containerId, createNearContainer, existingNearContainerSettings]
   );
@@ -394,6 +379,26 @@ export function usePrepareXnode({
     [session, containerId]
   );
 
+  const resetNearData = useMemo(
+    () => async () => {
+      if (!session) {
+        return;
+      }
+
+      removeDirectory({
+        session,
+        path: { scope: `container:${containerId}` },
+        data: {
+          path: "/var/lib/near-validator/.near/data",
+          make_empty: true,
+        },
+      })
+        .catch(console.error)
+        .then(() => restartNearContainer());
+    },
+    [session, containerId]
+  );
+
   const missingDependencies = [
     osUpdateNeeded,
     nearContainerMissing,
@@ -418,6 +423,7 @@ export function usePrepareXnode({
     nearContainerUpdateNeeded,
     updateNearContainer,
     restartNearContainer,
+    resetNearData,
     ready,
     validatorPublicKey,
     pingerAccountId,
