@@ -186,9 +186,9 @@ export function XnodeSummary({ xnode }: { xnode: Xnode }) {
               {disk
                 .map((d) => {
                   let used = d.used / d.total;
-                  if (used > 0.9) {
+                  if (used > 0.85) {
                     return "critical";
-                  } else if (used > 0.85) {
+                  } else if (used > 0.8) {
                     return "warning";
                   } else {
                     return undefined;
@@ -200,7 +200,7 @@ export function XnodeSummary({ xnode }: { xnode: Xnode }) {
                       <Alert variant="destructive" className="mt-2">
                         <AlertTitle>NEAR Node Critical</AlertTitle>
                         <AlertDescription>
-                          Storage usage has reached 90%. The node may stop and
+                          Storage usage has reached 85%. The node may stop and
                           performance could be severely affected. Click "Delete
                           NEAR chain data" immediately to avoid downtime.
                           Alternatively you can opt for increasing the storage
@@ -213,7 +213,7 @@ export function XnodeSummary({ xnode }: { xnode: Xnode }) {
                       <Alert className="mt-2">
                         <AlertTitle>NEAR Node Warning</AlertTitle>
                         <AlertDescription>
-                          Storage usage has reached 85%. Please click "Delete
+                          Storage usage has reached 80%. Please click "Delete
                           NEAR chain data" to free up space and prevent service
                           degradation. Alternatively you can opt for increasing
                           the storage with your hardware provider.
