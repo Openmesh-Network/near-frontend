@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useDebounce } from "@uidotdev/usehooks";
-import { Loader, MapPin, Search, Server, X } from "lucide-react";
+import { Loader, MapPin, Search, Server, Star, X } from "lucide-react";
 
 import { getSummary, type HardwareProduct, type Specs } from "@/lib/hardware";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ import { Slider } from "@/components/ui/slider";
 const STEP_MIN = 1;
 const STEP_MAX = 1000;
 const PRICE_MAX = 100000;
+const HIGHLIGHTED = [{ productName: "pro.md.amd", providerName: "Hivelocity" }];
 
 type HardwareSelectorProps = {
   specs?: Specs;
@@ -136,6 +137,25 @@ export default function HardwareSelector({
         return true;
       })
       .sort((p1, p2) => {
+        const p1_highlighted = HIGHLIGHTED.some(
+          (entry) =>
+            p1.productName === entry.productName &&
+            p1.providerName === entry.providerName
+        );
+        const p2_highlighted = HIGHLIGHTED.some(
+          (entry) =>
+            p1.productName === entry.productName &&
+            p1.providerName === entry.providerName
+        );
+
+        if (p1_highlighted && !p2_highlighted) {
+          return -1;
+        }
+
+        if (p2_highlighted && !p1_highlighted) {
+          return 1;
+        }
+
         if (p1.price.monthly === undefined && p2.price.monthly === undefined) {
           return 0;
         }
@@ -261,7 +281,18 @@ export default function HardwareSelector({
           }
         )
     ).map(([id, product], i) => {
-      return <ProductCard key={id} product={product} onSelect={onSelect} />;
+      return (
+        <ProductCard
+          key={id}
+          product={product}
+          highlighted={HIGHLIGHTED.some(
+            (entry) =>
+              Object.values(product)[0].productName === entry.productName &&
+              Object.values(product)[0].providerName === entry.providerName
+          )}
+          onSelect={onSelect}
+        />
+      );
     });
   }, [filteredProviderData, shownResults]);
 
@@ -484,6 +515,7 @@ export default function HardwareSelector({
 
 function ProductCard({
   product,
+  highlighted,
   onSelect,
 }: {
   product: {
@@ -491,6 +523,7 @@ function ProductCard({
       summary: string;
     };
   };
+  highlighted: boolean;
   onSelect: (product: HardwareProduct) => void;
 }) {
   const locations = useMemo(() => Object.keys(product), [product]);
@@ -505,7 +538,12 @@ function ProductCard({
   }, [locations]);
 
   return (
-    <li className="flex flex-col gap-4 rounded border px-6 py-4">
+    <li
+      className={cn(
+        "flex flex-col gap-4 rounded border px-6 py-4",
+        highlighted && "bg-green-50"
+      )}
+    >
       <div className="grid grid-cols-8 max-xl:grid-cols-4 items-center gap-12">
         <div className="col-span-3 max-xl:col-span-4 flex items-center gap-4">
           <Image
@@ -516,6 +554,14 @@ function ProductCard({
             className="text-xs"
           />
           <div className="flex flex-col">
+            {highlighted && (
+              <div className="flex">
+                <div className="flex gap-1 place-items-center text-white rounded-lg border px-2 py-0.5 text-sm bg-green-700">
+                  <Star className="size-4" />
+                  <span>Recommended</span>
+                </div>
+              </div>
+            )}
             <span className="font-bold">{selectedProduct?.productName}</span>
             <span className="text-sm text-muted-foreground">
               {selectedProduct?.summary}
