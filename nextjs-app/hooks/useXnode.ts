@@ -200,6 +200,7 @@ export function usePrepareXnode({
     };
 }`,
               network: null,
+              nvidia_gpus: null,
             },
             update_inputs: update ? [] : null,
           },
