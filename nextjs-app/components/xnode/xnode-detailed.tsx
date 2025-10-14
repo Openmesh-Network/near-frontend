@@ -671,6 +671,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                               .then((w) =>
                                 w.signAndSendTransaction({
                                   receiverId: `${poolVersion}.near`,
+                                  signerId: accountId ?? undefined,
                                   actions: [
                                     {
                                       type: "FunctionCall",
@@ -734,6 +735,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                   .then((w) =>
                                     w.signAndSendTransaction({
                                       receiverId: fullPoolId,
+                                      signerId: accountId ?? undefined,
                                       actions: [
                                         {
                                           type: "FunctionCall",
@@ -777,6 +779,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                 .then((w) =>
                                   w.signAndSendTransaction({
                                     receiverId: fullPoolId,
+                                    signerId: accountId ?? undefined,
                                     actions: [
                                       {
                                         type: "FunctionCall",
@@ -850,6 +853,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                             .then((w) =>
                               w.signAndSendTransaction({
                                 receiverId: fullPoolId,
+                                signerId: accountId ?? undefined,
                                 actions: [
                                   {
                                     type: "FunctionCall",
@@ -950,6 +954,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         .then((w) =>
                           w.signAndSendTransaction({
                             receiverId: pingerAccountId,
+                            signerId: accountId ?? undefined,
                             actions: [
                               {
                                 type: "Transfer",
