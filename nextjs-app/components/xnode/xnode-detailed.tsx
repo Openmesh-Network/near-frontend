@@ -1,6 +1,6 @@
 "use client";
 
-import { useSetSettings, useSettings } from "../context/settings";
+import { useSettings } from "../context/settings";
 import {
   Card,
   CardContent,
@@ -24,9 +24,9 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
-import { useNear } from "../near-provider";
+import { useNearWallet } from "../near-provider";
 import { useQuery } from "@tanstack/react-query";
-import { connect, keyStores } from "near-api-js";
+import { connect, keyStores, providers } from "near-api-js";
 import { AccountView, CodeResult } from "near-api-js/lib/providers/provider";
 import { ScrollArea } from "../ui/scroll-area";
 import { formatUnits, parseUnits } from "viem";
@@ -62,6 +62,7 @@ import {
 import { usePrepareXnode } from "@/hooks/useXnode";
 import { SubdomainClaimer } from "./subdomain-claimer";
 import { Alert, AlertTitle, AlertDescription } from "../ui/alert";
+import { actionCreators } from "@near-wallet-selector/core";
 
 export function XnodeDetailed({ domain }: { domain?: string }) {
   const searchParams = useSearchParams();
@@ -195,7 +196,12 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     },
   });
 
-  const { accountId, modal, selector, loading } = useNear();
+  const {
+    accountId,
+    connect: walletConnect,
+    disconnect: walletDisconnect,
+    signAndSendTransactions,
+  } = useNearWallet();
   const fullPoolId = `${poolId}.${poolVersion}.near`;
   const { data: poolDeployed } = useQuery({
     queryKey: ["poolDeployed", near ?? "", fullPoolId],
@@ -644,161 +650,109 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 </RowDiv>
               ))}
           </SectionCard>
-          {!loading && (
-            <SectionCard title="Manage Pool">
-              <div className="flex flex-col gap-3">
-                {poolDeployed !== undefined &&
-                  validatorPublicKey !== undefined &&
-                  (!poolDeployed ? (
-                    connectedAccountBalance !== undefined &&
-                    connectedAccountBalance <
-                      requiredAccountBalance.poolCost +
-                        requiredAccountBalance.gasFee ? (
-                      <RowDiv>
-                        <Status
-                          type="warning"
-                          text={`Pool not deployed. Connected account does not have ${requiredAccountBalance.poolCost} NEAR (+ <${requiredAccountBalance.gasFee} in gas fees) required to deploy one.`}
-                        />
-                      </RowDiv>
-                    ) : (
-                      <RowDiv>
-                        <Status type="warning" text="Pool not deployed." />
-                        <Button
-                          onClick={() => {
-                            setBusy(true);
-                            selector
-                              .wallet()
-                              .then((w) =>
-                                w.signAndSendTransaction({
-                                  receiverId: `${poolVersion}.near`,
-                                  signerId: accountId ?? undefined,
-                                  actions: [
-                                    {
-                                      type: "FunctionCall",
-                                      params: {
-                                        methodName: "create_staking_pool",
-                                        args: {
-                                          staking_pool_id: poolId,
-                                          owner_id: accountId,
-                                          stake_public_key: validatorPublicKey,
-                                          reward_fee_fraction: {
-                                            numerator: rewardFee,
-                                            denominator: 100,
-                                          },
-                                          code_hash:
-                                            poolVersion === "pool"
-                                              ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
-                                              : undefined,
-                                        },
-                                        deposit: parseUnits(
-                                          requiredAccountBalance.poolCost.toString(),
-                                          24
-                                        ).toString(),
-                                        gas: "300000000000000",
-                                      },
-                                    },
-                                  ],
-                                })
-                              )
-                              .catch(console.error)
-                              .finally(() => setBusy(false));
-                          }}
-                          disabled={busy}
-                        >
-                          Deploy
-                        </Button>
-                      </RowDiv>
-                    )
+          <SectionCard title="Manage Pool">
+            <div className="flex flex-col gap-3">
+              {accountId &&
+                poolDeployed !== undefined &&
+                validatorPublicKey !== undefined &&
+                (!poolDeployed ? (
+                  connectedAccountBalance !== undefined &&
+                  connectedAccountBalance <
+                    requiredAccountBalance.poolCost +
+                      requiredAccountBalance.gasFee ? (
+                    <RowDiv>
+                      <Status
+                        type="warning"
+                        text={`Pool not deployed. Connected account does not have ${requiredAccountBalance.poolCost} NEAR (+ <${requiredAccountBalance.gasFee} in gas fees) required to deploy one.`}
+                      />
+                    </RowDiv>
                   ) : (
                     <RowDiv>
-                      <Status type="success" text="Pool deployed." />
+                      <Status type="warning" text="Pool not deployed." />
+                      <Button
+                        onClick={() => {
+                          setBusy(true);
+                          signAndSendTransactions({
+                            transactions: [
+                              {
+                                receiverId: `${poolVersion}.near`,
+                                signerId: accountId,
+                                actions: [
+                                  actionCreators.functionCall(
+                                    "create_staking_pool",
+                                    {
+                                      staking_pool_id: poolId,
+                                      owner_id: accountId,
+                                      stake_public_key: validatorPublicKey,
+                                      reward_fee_fraction: {
+                                        numerator: rewardFee,
+                                        denominator: 100,
+                                      },
+                                      code_hash:
+                                        poolVersion === "pool"
+                                          ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
+                                          : undefined,
+                                    },
+                                    BigInt("300000000000000"),
+                                    BigInt(
+                                      parseUnits(
+                                        requiredAccountBalance.poolCost.toString(),
+                                        24
+                                      ).toString()
+                                    )
+                                  ),
+                                ],
+                              },
+                            ],
+                          })
+                            .catch(console.error)
+                            .finally(() => setBusy(false));
+                        }}
+                        disabled={busy}
+                      >
+                        Deploy
+                      </Button>
                     </RowDiv>
-                  ))}
-                {poolDeployed !== undefined &&
-                  poolDeployed &&
-                  deployedPoolSettings &&
-                  (deployedPoolSettings.owner_id === accountId ? (
-                    <>
-                      {validatorPublicKey &&
-                        deployedPoolSettings.stake_public_key !==
-                          validatorPublicKey && (
-                          <RowDiv>
-                            <Status
-                              type="warning"
-                              text="Pool validator public key mismatch."
-                            />
-                            <Button
-                              onClick={() => {
-                                setBusy(true);
-                                selector
-                                  .wallet()
-                                  .then((w) =>
-                                    w.signAndSendTransaction({
-                                      receiverId: fullPoolId,
-                                      signerId: accountId ?? undefined,
-                                      actions: [
-                                        {
-                                          type: "FunctionCall",
-                                          params: {
-                                            methodName: "update_staking_key",
-                                            args: {
-                                              stake_public_key:
-                                                validatorPublicKey,
-                                            },
-                                            deposit: "0",
-                                            gas: "300000000000000",
-                                          },
-                                        },
-                                      ],
-                                    })
-                                  )
-                                  .catch(console.error)
-                                  .then(() => refetchDeployedPoolSettings())
-                                  .finally(() => setBusy(false));
-                              }}
-                              disabled={busy}
-                            >
-                              Update
-                            </Button>
-                          </RowDiv>
-                        )}
-                      {(deployedPoolSettings.reward_fee_fraction.numerator !==
-                        rewardFee ||
-                        deployedPoolSettings.reward_fee_fraction.denominator !==
-                          100) && (
+                  )
+                ) : (
+                  <RowDiv>
+                    <Status type="success" text="Pool deployed." />
+                  </RowDiv>
+                ))}
+              {poolDeployed !== undefined &&
+                poolDeployed &&
+                deployedPoolSettings &&
+                (deployedPoolSettings.owner_id === accountId ? (
+                  <>
+                    {validatorPublicKey &&
+                      deployedPoolSettings.stake_public_key !==
+                        validatorPublicKey && (
                         <RowDiv>
                           <Status
                             type="warning"
-                            text="Pool reward fee changed."
+                            text="Pool validator public key mismatch."
                           />
                           <Button
                             onClick={() => {
                               setBusy(true);
-                              selector
-                                .wallet()
-                                .then((w) =>
-                                  w.signAndSendTransaction({
+                              signAndSendTransactions({
+                                transactions: [
+                                  {
                                     receiverId: fullPoolId,
                                     signerId: accountId ?? undefined,
                                     actions: [
-                                      {
-                                        type: "FunctionCall",
-                                        params: {
-                                          methodName:
-                                            "update_reward_fee_fraction",
-                                          args: {
-                                            reward_fee_fraction: {
-                                              numerator: rewardFee,
-                                              denominator: 100,
-                                            },
-                                          },
-                                          deposit: "0",
-                                          gas: "300000000000000",
+                                      actionCreators.functionCall(
+                                        "update_staking_key",
+                                        {
+                                          stake_public_key: validatorPublicKey,
                                         },
-                                      },
+                                        BigInt("300000000000000"),
+                                        BigInt("0")
+                                      ),
                                     ],
-                                  })
-                                )
+                                  },
+                                ],
+                              })
                                 .catch(console.error)
                                 .then(() => refetchDeployedPoolSettings())
                                 .finally(() => setBusy(false));
@@ -809,120 +763,150 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                           </Button>
                         </RowDiv>
                       )}
-                    </>
-                  ) : (
-                    <>
-                      {accountId ? (
-                        <RowDiv>
-                          <Status
-                            type="warning"
-                            text="Connected wallet is not the owner of this pool."
-                          />
-                        </RowDiv>
-                      ) : (
-                        <RowDiv>
-                          <Status type="warning" text="No wallet connected." />
-                        </RowDiv>
-                      )}
-                    </>
-                  ))}
-                {totalPoolStake !== undefined && (
-                  <RowDiv>
-                    <span>Total Stake:</span>
-                    <span>{totalPoolStake.toFixed(1)} NEAR</span>
-                  </RowDiv>
-                )}
-                {!loading && poolDeployed && (
-                  <RowDiv>
-                    <Label className="text-base" htmlFor="stake-topup">
-                      Add Stake:
-                    </Label>
-                    <div className="flex gap-1">
-                      <Input
-                        id="stake-topup"
-                        className="max-w-20"
-                        type="number"
-                        value={stakeTopUp}
-                        onChange={(e) => setStakeTopUp(e.target.value)}
-                      />
-                      <Button
-                        onClick={() => {
-                          setBusy(true);
-                          selector
-                            .wallet()
-                            .then((w) =>
-                              w.signAndSendTransaction({
-                                receiverId: fullPoolId,
-                                signerId: accountId ?? undefined,
-                                actions: [
-                                  {
-                                    type: "FunctionCall",
-                                    params: {
-                                      methodName: "deposit_and_stake",
-                                      args: {},
-                                      deposit: parseUnits(
-                                        stakeTopUp,
-                                        24
-                                      ).toString(),
-                                      gas: "300000000000000",
-                                    },
-                                  },
-                                ],
-                              })
-                            )
-                            .catch(console.error)
-                            .then(() => refetchTotalPoolStake())
-                            .finally(() => setBusy(false));
-                        }}
-                        disabled={busy}
-                      >
-                        Stake
-                      </Button>
-                    </div>
-                  </RowDiv>
-                )}
-              </div>
-              <div className="text-sm">
-                {accountId ? (
-                  <div className="overflow-x-auto">
-                    <Button
-                      className="px-2 py-0.5 h-auto"
-                      onClick={() =>
-                        selector
-                          .wallet()
-                          .then((w) => w.signOut())
-                          .catch(console.error)
-                      }
-                    >
-                      Disconnect{" "}
-                      <span className="break-words">{accountId}</span>
-                      {connectedAccountBalance && (
-                        <div className="flex">
-                          <span>(</span>
-                          <Image
-                            alt="NEAR logo"
-                            src={NearLogo}
-                            width={20}
-                            height={20}
-                          />
-                          <span>{connectedAccountBalance.toFixed(3)} )</span>
-                        </div>
-                      )}
-                    </Button>
-                  </div>
+                    {(deployedPoolSettings.reward_fee_fraction.numerator !==
+                      rewardFee ||
+                      deployedPoolSettings.reward_fee_fraction.denominator !==
+                        100) && (
+                      <RowDiv>
+                        <Status
+                          type="warning"
+                          text="Pool reward fee changed."
+                        />
+                        <Button
+                          onClick={() => {
+                            setBusy(true);
+                            signAndSendTransactions({
+                              transactions: [
+                                {
+                                  receiverId: fullPoolId,
+                                  signerId: accountId ?? undefined,
+                                  actions: [
+                                    actionCreators.functionCall(
+                                      "update_reward_fee_fraction",
+                                      {
+                                        reward_fee_fraction: {
+                                          numerator: rewardFee,
+                                          denominator: 100,
+                                        },
+                                      },
+                                      BigInt("300000000000000"),
+                                      BigInt("0")
+                                    ),
+                                  ],
+                                },
+                              ],
+                            })
+                              .catch(console.error)
+                              .then(() => refetchDeployedPoolSettings())
+                              .finally(() => setBusy(false));
+                          }}
+                          disabled={busy}
+                        >
+                          Update
+                        </Button>
+                      </RowDiv>
+                    )}
+                  </>
                 ) : (
-                  <div>
+                  <>
+                    {accountId ? (
+                      <RowDiv>
+                        <Status
+                          type="warning"
+                          text="Connected wallet is not the owner of this pool."
+                        />
+                      </RowDiv>
+                    ) : (
+                      <RowDiv>
+                        <Status type="warning" text="No wallet connected." />
+                      </RowDiv>
+                    )}
+                  </>
+                ))}
+              {totalPoolStake !== undefined && (
+                <RowDiv>
+                  <span>Total Stake:</span>
+                  <span>{totalPoolStake.toFixed(1)} NEAR</span>
+                </RowDiv>
+              )}
+              {accountId && poolDeployed && (
+                <RowDiv>
+                  <Label className="text-base" htmlFor="stake-topup">
+                    Add Stake:
+                  </Label>
+                  <div className="flex gap-1">
+                    <Input
+                      id="stake-topup"
+                      className="max-w-20"
+                      type="number"
+                      value={stakeTopUp}
+                      onChange={(e) => setStakeTopUp(e.target.value)}
+                    />
                     <Button
-                      className="px-2 py-0.5 h-auto"
-                      onClick={() => modal.show()}
+                      onClick={() => {
+                        setBusy(true);
+                        signAndSendTransactions({
+                          transactions: [
+                            {
+                              receiverId: fullPoolId,
+                              signerId: accountId ?? undefined,
+                              actions: [
+                                actionCreators.functionCall(
+                                  "deposit_and_stake",
+                                  {},
+                                  BigInt("300000000000000"),
+                                  BigInt(parseUnits(stakeTopUp, 24).toString())
+                                ),
+                              ],
+                            },
+                          ],
+                        })
+                          .catch(console.error)
+                          .then(() => refetchTotalPoolStake())
+                          .finally(() => setBusy(false));
+                      }}
+                      disabled={busy}
                     >
-                      Connect NEAR wallet
+                      Stake
                     </Button>
                   </div>
-                )}
-              </div>
-            </SectionCard>
-          )}
+                </RowDiv>
+              )}
+            </div>
+            <div className="text-sm">
+              {accountId ? (
+                <div className="overflow-x-auto">
+                  <Button
+                    className="px-2 py-0.5 h-auto"
+                    onClick={() => walletDisconnect().catch(console.error)}
+                  >
+                    Disconnect <span className="break-words">{accountId}</span>
+                    {connectedAccountBalance && (
+                      <div className="flex">
+                        <span>(</span>
+                        <Image
+                          alt="NEAR logo"
+                          src={NearLogo}
+                          width={20}
+                          height={20}
+                        />
+                        <span>{connectedAccountBalance.toFixed(3)} )</span>
+                      </div>
+                    )}
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <Button
+                    className="px-2 py-0.5 h-auto"
+                    onClick={() => walletConnect().catch(console.error)}
+                  >
+                    Connect NEAR wallet
+                  </Button>
+                </div>
+              )}
+            </div>
+          </SectionCard>
           {existingNearContainerSettings?.pinger && pingerAccountId && (
             <SectionCard title="Pinger">
               <span>
@@ -934,7 +918,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   Pinger Balance: {pingerAccountBalance.toFixed(3)} NEAR
                 </span>
               )}
-              {!loading && (
+              {accountId && (
                 <RowDiv>
                   <Label className="text-base" htmlFor="pinger-topup">
                     Top Up:{" "}
@@ -949,25 +933,19 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   <Button
                     onClick={() => {
                       setBusy(true);
-                      selector
-                        .wallet()
-                        .then((w) =>
-                          w.signAndSendTransaction({
+                      signAndSendTransactions({
+                        transactions: [
+                          {
                             receiverId: pingerAccountId,
                             signerId: accountId ?? undefined,
                             actions: [
-                              {
-                                type: "Transfer",
-                                params: {
-                                  deposit: parseUnits(
-                                    pingerTopUp,
-                                    24
-                                  ).toString(),
-                                },
-                              },
+                              actionCreators.transfer(
+                                BigInt(parseUnits(pingerTopUp, 24).toString())
+                              ),
                             ],
-                          })
-                        )
+                          },
+                        ],
+                      })
                         .catch(console.error)
                         .then(() => refetchPingerAccountBalance())
                         .finally(() => setBusy(false));

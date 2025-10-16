@@ -1,7 +1,7 @@
 import { ReactNode } from "react";
 import Web3Provider from "./web3-provider";
 import { SettingsProvider } from "./context/settings";
-import { NearProvider } from "./near-provider";
+import { NearWalletProvider } from "./near-provider";
 import { Toaster } from "./ui/sonner";
 
 export function ContextProvider({
@@ -14,10 +14,10 @@ export function ContextProvider({
   return (
     <SettingsProvider>
       <Web3Provider cookies={cookies}>
-        <NearProvider>
+        <NearWalletProvider>
           {children}
           <Toaster />
-        </NearProvider>
+        </NearWalletProvider>
       </Web3Provider>
     </SettingsProvider>
   );
