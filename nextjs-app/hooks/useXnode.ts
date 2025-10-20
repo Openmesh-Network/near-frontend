@@ -133,6 +133,7 @@ export function usePrepareXnode({
             settings: {
               flake: `{
   inputs = {
+    xnode-manager.url = "github:Openmesh-Network/xnode-manager";
     near-validator.url = "github:Openmesh-Network/near-validator";
     nixpkgs.follows = "near-validator/nixpkgs";
   };
@@ -146,58 +147,43 @@ export function usePrepareXnode({
     ];
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      near-validator,
-      ...
-    }:
-    let
-      system = "x86_64-linux";
-    in
-    {
-      nixosConfigurations.container = nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = {
-          inherit near-validator;
-        };
-        modules = [
-          (
-            { near-validator, lib, ... }:
-            {
-              imports = [
-                near-validator.nixosModules.default
-              ];
-
-              boot.isContainer = true;
-
-              services.near-validator = {
-                enable = true;
-                pool = {
-                  id = "${poolId}";
-                  version = "${poolVersion}";
-                };
-                pinger.enable = ${pinger ? "true" : "false"};
-              };
-
-              networking = {
-                firewall.allowedTCPPorts = [
-                  3030
-                  24567
-                ];
-
-                useHostResolvConf = nixpkgs.lib.mkForce false;
-              };
-
-              services.resolved.enable = true;
-
-              system.stateVersion = "25.05";
-            }
-          )
-        ];
+  outputs = inputs: {
+    nixosConfigurations.container = inputs.nixpkgs.lib.nixosSystem {
+      specialArgs = {
+        inherit inputs;
       };
+      modules = [
+        inputs.xnode-manager.nixosModules.container
+        {
+          services.xnode-container.xnode-config = {
+            host-platform = ./xnode-config/host-platform;
+            state-version = ./xnode-config/state-version;
+            hostname = ./xnode-config/hostname;
+          };
+        }
+        inputs.near-validator.nixosModules.default
+        (
+          { pkgs, ... }@args:
+          {
+            # START USER CONFIG
+            services.near-validator.pool.id = "${poolId}";
+            services.near-validator.pool.version = "${poolVersion}";
+            services.near-validator.pinger.enable = ${
+              pinger ? "true" : "false"
+            };
+            # END USER CONFIG
+
+            services.near-validator.enable = true;
+
+            networking.firewall.allowedTCPPorts = [
+              3030
+              24567
+            ];
+          }
+        )
+      ];
     };
+  };
 }`,
               network: null,
               nvidia_gpus: null,

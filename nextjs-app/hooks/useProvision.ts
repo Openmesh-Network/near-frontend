@@ -179,6 +179,62 @@ export function useProvision() {
             );
           ipAddress = updatedMachine.main_ip;
         }
+      } else if (hardware.providerName === "Hetzner") {
+        const productInfo = hardware.id.split("_");
+        const productName = productInfo[0];
+        const locationName = productInfo[1];
+        const machine = await axios
+          .get("/api/hetzner/rewrite", {
+            params: {
+              path: `v1/servers/${existingInstance}`,
+              method: existingInstance ? "PUT" : "POST",
+              body: JSON.stringify({
+                name: "xnode.openmesh.network",
+                location: locationName,
+                server_type: productName,
+                image: "ubuntu-24.04",
+                user_data: cloudInit,
+                public_net: {
+                  enable_ipv4: true,
+                  enable_ipv6: true,
+                },
+              }),
+            },
+            headers: {
+              Authorization: `Bearer ${debouncedApiKey}`,
+            },
+          })
+          .then(
+            (res) =>
+              res.data.server as {
+                id: number;
+                public_net?: { ipv4?: { ip?: string } };
+              }
+          );
+        ipAddress = machine.public_net?.ipv4?.ip as string;
+        deploymentAuth = `servers/${machine.id}`;
+
+        while (!ipAddress || ipAddress === "0.0.0.0") {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const updatedMachine = await axios
+            .get("/api/hetzner/rewrite", {
+              params: {
+                path: `v1/${deploymentAuth}`,
+                method: "GET",
+              },
+              headers: {
+                Authorization: `Bearer ${debouncedApiKey}`,
+              },
+            })
+            .then(
+              (res) =>
+                res.data.server as {
+                  id: number;
+                  public_net?: { ipv4?: { ip?: string } };
+                }
+            );
+          ipAddress = updatedMachine.public_net?.ipv4?.ip as string;
+        }
       }
 
       return {

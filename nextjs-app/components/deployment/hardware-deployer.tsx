@@ -24,6 +24,8 @@ import {
 import { useProvision } from "@/hooks/useProvision";
 import { toast } from "sonner";
 import { useAddress } from "@/hooks/useAddress";
+import { LoginXnode, LoginXnodeParams } from "../xnode/login";
+import { useSetSettings, useSettings, Xnode } from "../context/settings";
 
 export default function HardwareDeployer({
   hardware,
@@ -103,6 +105,16 @@ export default function HardwareDeployer({
               Authorization: `Bearer ${debouncedApiKey}`,
             },
           });
+        } else if (hardware.providerName === "Hetzner") {
+          await axios.get("/api/hetzner/rewrite", {
+            params: {
+              path: "v1/pricing",
+              method: "GET",
+            },
+            headers: {
+              Authorization: `Bearer ${debouncedApiKey}`,
+            },
+          });
         }
         return true;
       } catch (err) {
@@ -111,205 +123,245 @@ export default function HardwareDeployer({
     },
   });
 
+  const [login, setLogin] = useState<LoginXnodeParams | undefined>(undefined);
+  const settings = useSettings();
+  const setSettings = useSetSettings();
+
   return (
-    <div className="flex flex-col gap-2">
-      {step === "summary" && (
-        <div className="flex flex-col gap-1">
-          {hardware.ram.capacity <= 1 && (
-            <Alert>
-              <TriangleAlert />
-              <AlertTitle>Warning: Low Spec Machine</AlertTitle>
-              <AlertDescription>
-                Processes might take longer than expected due to the low specs
-                of this machine. Please upgrade to a larger machine for a better
-                experience.
-              </AlertDescription>
-            </Alert>
-          )}
-          <div>
-            <div className="flex gap-3 place-items-center">
-              <span>{hardware.providerName}</span>
-              <span className="text-2xl font-bold">{hardware.productName}</span>
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="size-3.5" />
-                {hardware.location}
+    <>
+      <div className="flex flex-col gap-2">
+        {step === "summary" && (
+          <div className="flex flex-col gap-1">
+            {hardware.ram.capacity <= 1 && (
+              <Alert>
+                <TriangleAlert />
+                <AlertTitle>Warning: Low Spec Machine</AlertTitle>
+                <AlertDescription>
+                  Processes might take longer than expected due to the low specs
+                  of this machine. Please upgrade to a larger machine for a
+                  better experience.
+                </AlertDescription>
+              </Alert>
+            )}
+            <div>
+              <div className="flex gap-3 place-items-center">
+                <span>{hardware.providerName}</span>
+                <span className="text-2xl font-bold">
+                  {hardware.productName}
+                </span>
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <MapPin className="size-3.5" />
+                  {hardware.location}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 mt-2">
+                <span className="text-muted-foreground">{summary}</span>
+                {false && availableExtraStorage.length > 1 && (
+                  <div className="flex gap-3">
+                    <Label>Add Storage</Label>
+                    <Select
+                      value={extraStorage.toString()}
+                      onValueChange={(e) => setExtraStorage(parseInt(e))}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableExtraStorage.map((storage, i) => (
+                          <SelectItem key={i} value={storage.size.toString()}>
+                            {storage.size} GB (+${storage.price.monthly}/mo)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <Separator className="my-4" />
+              <div className="flex gap-4 place-items-center">
+                <span className="text-sm font-medium flex place-items-center gap-1">
+                  Estimated{" "}
+                  <ComboBox
+                    items={Object.keys(hardware.price).map((p) => {
+                      return { label: p, value: p };
+                    })}
+                    value={paymentPeriod}
+                    onChange={(p) => setPaymentPeriod(p ?? "monthly")}
+                  />{" "}
+                  price
+                </span>
+                <span className="mt-1 text-4xl font-bold text-primary">
+                  ${hardware.price[paymentPeriod]}
+                  <span className="text-xl">
+                    /
+                    {
+                      paymentPeriod.substring(
+                        0,
+                        paymentPeriod.length - 2
+                      ) /* remove ly */
+                    }
+                  </span>
+                </span>
               </div>
             </div>
-            <div className="flex flex-col gap-2 mt-2">
-              <span className="text-muted-foreground">{summary}</span>
-              {false && availableExtraStorage.length > 1 && (
-                <div className="flex gap-3">
-                  <Label>Add Storage</Label>
-                  <Select
-                    value={extraStorage.toString()}
-                    onValueChange={(e) => setExtraStorage(parseInt(e))}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableExtraStorage.map((storage, i) => (
-                        <SelectItem key={i} value={storage.size.toString()}>
-                          {storage.size} GB (+${storage.price.monthly}/mo)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            <Separator className="my-4" />
-            <div className="flex gap-4 place-items-center">
-              <span className="text-sm font-medium flex place-items-center gap-1">
-                Estimated{" "}
-                <ComboBox
-                  items={Object.keys(hardware.price).map((p) => {
-                    return { label: p, value: p };
-                  })}
-                  value={paymentPeriod}
-                  onChange={(p) => setPaymentPeriod(p ?? "monthly")}
-                />{" "}
-                price
+          </div>
+        )}
+        {step === "auth" && (
+          <div className="flex flex-col gap-1">
+            <span className="text-2xl font-bold">
+              Link {hardware.providerName} Account
+            </span>
+            <span className="text-muted-foreground">
+              To setup your server, you first need to connect to the provider
+              through an API key. This allows Xnode Studio to rent the chosen
+              machine in your account. Pressing the rent button will place an
+              order in your provider account. Please be aware that every time
+              you press this button a new machine will be ordered.
+            </span>
+            <span className="mt-2">
+              {`${hardware.productName} | $${hardware.price[paymentPeriod]}/${
+                paymentPeriod.substring(
+                  0,
+                  paymentPeriod.length - 2
+                ) /* remove ly */
+              }`}
+            </span>
+            <div className="mt-2 flex flex-col rounded border p-4">
+              <span className="text-lg font-semibold">
+                {hardware.providerName}
               </span>
-              <span className="mt-1 text-4xl font-bold text-primary">
-                ${hardware.price[paymentPeriod]}
-                <span className="text-xl">
-                  /
-                  {
-                    paymentPeriod.substring(
-                      0,
-                      paymentPeriod.length - 2
-                    ) /* remove ly */
+              <div className="mt-2 space-y-0.5">
+                <Label htmlFor="apiKey">API Key</Label>
+                <Input
+                  id="apiKey"
+                  name="apiKey"
+                  value={apiKey}
+                  className={
+                    validApiKey === false
+                      ? "border-red-600"
+                      : validApiKey === true
+                      ? "border-green-500"
+                      : ""
                   }
-                </span>
+                  onChange={(e) => setApiKey(e.target.value)}
+                  type="password"
+                />
+              </div>
+              {validApiKey === false && (
+                <span className="text-sm text-red-700">Invalid API key</span>
+              )}
+              <span className="mt-1 text-sm text-muted-foreground">
+                Don&apos;t have an API key yet?{" "}
+                <Link
+                  href={
+                    hardware.providerName === "Hivelocity"
+                      ? "https://developers.hivelocity.net/docs/api-keys"
+                      : hardware.providerName === "Vultr"
+                      ? "https://docs.vultr.com/create-a-limited-subuser-profile-with-api-access-at-vultr"
+                      : hardware.providerName === "Hetzner"
+                      ? "https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/"
+                      : "#"
+                  }
+                  target="_blank"
+                  className="underline underline-offset-2"
+                >
+                  Get one here.
+                </Link>
               </span>
             </div>
           </div>
-        </div>
-      )}
-      {step === "auth" && (
-        <div className="flex flex-col gap-1">
-          <span className="text-2xl font-bold">
-            Link {hardware.providerName} Account
-          </span>
-          <span className="text-muted-foreground">
-            To setup your server, you first need to connect to the provider
-            through an API key. This allows Xnode Studio to rent the chosen
-            machine in your account. Pressing the rent button will place an
-            order in your provider account. Please be aware that every time you
-            press this button a new machine will be ordered.
-          </span>
-          <span className="mt-2">
-            {`${hardware.productName} | $${hardware.price[paymentPeriod]}/${
-              paymentPeriod.substring(
-                0,
-                paymentPeriod.length - 2
-              ) /* remove ly */
-            }`}
-          </span>
-          <div className="mt-2 flex flex-col rounded border p-4">
-            <span className="text-lg font-semibold">
-              {hardware.providerName}
-            </span>
-            <div className="mt-2 space-y-0.5">
-              <Label htmlFor="apiKey">API Key</Label>
-              <Input
-                id="apiKey"
-                name="apiKey"
-                value={apiKey}
-                className={
-                  validApiKey === false
-                    ? "border-red-600"
-                    : validApiKey === true
-                    ? "border-green-500"
-                    : ""
-                }
-                onChange={(e) => setApiKey(e.target.value)}
-                type="password"
-              />
-            </div>
-            {validApiKey === false && (
-              <span className="text-sm text-red-700">Invalid API key</span>
-            )}
-            <span className="mt-1 text-sm text-muted-foreground">
-              Don&apos;t have an API key yet?{" "}
-              <Link
-                href={
-                  hardware.providerName === "Hivelocity"
-                    ? "https://developers.hivelocity.net/docs/api-keys"
-                    : hardware.providerName === "Vultr"
-                    ? "https://docs.vultr.com/create-a-limited-subuser-profile-with-api-access-at-vultr"
-                    : "#"
-                }
-                target="_blank"
-                className="underline underline-offset-2"
-              >
-                Get one here.
-              </Link>
-            </span>
-          </div>
-        </div>
-      )}
-      <div className="flex gap-3 place-content-end">
-        <Button
-          size="lg"
-          className="h-10 min-w-40"
-          onClick={() => {
-            if (step === "summary") {
-              onCancel();
-            }
-            if (step === "auth") {
-              setStep("summary");
-            }
-          }}
-          disabled={provisioning}
-        >
-          Back
-        </Button>
-        <Button
-          size="lg"
-          className="h-10 min-w-40"
-          onClick={() => {
-            if (step === "summary") {
-              setStep("auth");
-            }
-            if (step === "auth") {
-              if (!address) {
-                toast("Error", {
-                  description: "Wallet not connected.",
-                  style: { backgroundColor: "red" },
-                });
-                return;
+        )}
+        <div className="flex gap-3 place-content-end">
+          <Button
+            size="lg"
+            className="h-10 min-w-40"
+            onClick={() => {
+              if (step === "summary") {
+                onCancel();
               }
-
-              provisionHardware({
-                hardware,
-                paymentPeriod,
-                debouncedApiKey,
-                extraStorage,
-                owner: address,
-              }).then((res) => {
-                if (res.type === "success") {
-                  onDeployed({
-                    ipAddress: res.ipAddress,
-                    deploymentAuth: res.deploymentAuth,
-                    owner: address,
-                  });
-                  setStep("summary");
-                } else {
+              if (step === "auth") {
+                setStep("summary");
+              }
+            }}
+            disabled={provisioning}
+          >
+            Back
+          </Button>
+          <Button
+            size="lg"
+            className="h-10 min-w-40"
+            onClick={() => {
+              if (step === "summary") {
+                setStep("auth");
+              }
+              if (step === "auth") {
+                if (!address) {
                   toast("Error", {
-                    description: res.errorMessage,
+                    description: "Wallet not connected.",
                     style: { backgroundColor: "red" },
                   });
+                  return;
                 }
-              });
-            }
-          }}
-          disabled={(step === "auth" && !validApiKey) || provisioning}
-        >
-          {step === "summary" ? "Next" : step === "auth" ? "Rent Server" : ""}
-        </Button>
+
+                const messageDomain = "manager.xnode.local";
+                const messageTimestamp = Math.round(Date.now() / 1000);
+
+                setLogin({
+                  message: `Xnode Auth authenticate ${messageDomain} at ${messageTimestamp}`,
+                  onSigned(signature) {
+                    provisionHardware({
+                      hardware,
+                      paymentPeriod,
+                      debouncedApiKey,
+                      extraStorage,
+                      owner: address,
+                    }).then((res) => {
+                      if (res.type === "success") {
+                        const importedXnode = {
+                          insecure: res.ipAddress,
+                          owner: address,
+                          deploymentAuth: res.deploymentAuth,
+                          loginArgs: {
+                            user: address,
+                            signature,
+                            timestamp: messageTimestamp.toString(),
+                          },
+                        } as Xnode;
+
+                        setSettings({
+                          ...settings,
+                          xnodes: settings.xnodes.concat([importedXnode]),
+                        });
+
+                        onDeployed({
+                          ipAddress: res.ipAddress,
+                          deploymentAuth: res.deploymentAuth,
+                          owner: address,
+                        });
+                        setStep("summary");
+                      } else {
+                        toast("Error", {
+                          description: res.errorMessage,
+                          style: { backgroundColor: "red" },
+                        });
+                      }
+                      setLogin(undefined);
+                    });
+                  },
+                  onCancel() {
+                    setLogin(undefined);
+                  },
+                });
+              }
+            }}
+            disabled={(step === "auth" && !validApiKey) || provisioning}
+          >
+            {step === "summary" ? "Next" : step === "auth" ? "Rent Server" : ""}
+          </Button>
+        </div>
       </div>
-    </div>
+
+      {login && <LoginXnode {...login} />}
+    </>
   );
 }

@@ -60,17 +60,32 @@ export default function HardwareSelector({
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000, // 1 min
   });
+  const { data: hetznerData, isFetching: hetznerFetching } = useQuery({
+    queryKey: ["inventory", "Hetzner"],
+    queryFn: async () => {
+      return fetch("/api/hetzner/inventory")
+        .then((res) => res.json())
+        .then((res) => res as HardwareProduct[]);
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000, // 1 min
+  });
 
   const rawProviderData = useMemo(
-    () => (hivelocityData ?? []).concat(vultrData ?? []),
-    [hivelocityData, vultrData]
+    () =>
+      ([] as HardwareProduct[])
+        .concat(hivelocityData ?? [])
+        .concat(vultrData ?? [])
+        .concat(hetznerData ?? []),
+    [hivelocityData, vultrData, hetznerData]
   );
   const providersLoading = useMemo(
     () => [
       { name: "Hivelocity", loaded: !hivelocityFetching },
       { name: "Vultr", loaded: !vultrFetching },
+      { name: "Hetzner", loaded: !hetznerFetching },
     ],
-    [hivelocityFetching, vultrFetching]
+    [hivelocityFetching, vultrFetching, hetznerFetching]
   );
   const providersFetching = useMemo(
     () => providersLoading.some((provider) => !provider.loaded),
@@ -551,7 +566,7 @@ function ProductCard({
             alt={selectedProduct?.providerName + " logo"}
             width={48}
             height={48}
-            className="text-xs"
+            className="text-xs size-[48px]"
           />
           <div className="flex flex-col">
             {highlighted && (

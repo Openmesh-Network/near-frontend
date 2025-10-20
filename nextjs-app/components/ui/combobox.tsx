@@ -71,7 +71,6 @@ export function ComboBox({
   if (isDesktop) {
     return (
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverAnchor />
         <PopoverTrigger disabled={disabled} asChild>
           {trigger}
         </PopoverTrigger>
