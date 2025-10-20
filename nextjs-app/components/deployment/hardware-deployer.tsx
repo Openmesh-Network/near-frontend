@@ -191,7 +191,14 @@ export default function HardwareDeployer({
                   price
                 </span>
                 <span className="mt-1 text-4xl font-bold text-primary">
-                  ${hardware.price[paymentPeriod]}
+                  {hardware.price[paymentPeriod]
+                    ? new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: "USD",
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 5,
+                      }).format(hardware.price[paymentPeriod])
+                    : "?"}
                   <span className="text-xl">
                     /
                     {
