@@ -178,7 +178,7 @@ export default function HardwareDeployer({
                 )}
               </div>
               <Separator className="my-4" />
-              <div className="flex gap-4 place-items-center">
+              <div className="flex md:gap-4 place-items-center max-md:place-content-center max-md:flex-col">
                 <span className="text-sm font-medium flex place-items-center gap-1">
                   Estimated{" "}
                   <ComboBox
