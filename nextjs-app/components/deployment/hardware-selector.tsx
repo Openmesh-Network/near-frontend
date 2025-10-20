@@ -159,8 +159,8 @@ export default function HardwareSelector({
         );
         const p2_highlighted = HIGHLIGHTED.some(
           (entry) =>
-            p1.productName === entry.productName &&
-            p1.providerName === entry.providerName
+            p2.productName === entry.productName &&
+            p2.providerName === entry.providerName
         );
 
         if (p1_highlighted && !p2_highlighted) {
