@@ -678,29 +678,53 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                 receiverId: `${poolVersion}.near`,
                                 signerId: accountId,
                                 actions: [
-                                  actionCreators.functionCall(
-                                    "create_staking_pool",
-                                    {
-                                      staking_pool_id: poolId,
-                                      owner_id: accountId,
-                                      stake_public_key: validatorPublicKey,
-                                      reward_fee_fraction: {
-                                        numerator: rewardFee,
-                                        denominator: 100,
+                                  {
+                                    type: "FunctionCall",
+                                    params: {
+                                      methodName: "create_staking_pool",
+                                      args: {
+                                        staking_pool_id: poolId,
+                                        owner_id: accountId,
+                                        stake_public_key: validatorPublicKey,
+                                        reward_fee_fraction: {
+                                          numerator: rewardFee,
+                                          denominator: 100,
+                                        },
+                                        code_hash:
+                                          poolVersion === "pool"
+                                            ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
+                                            : undefined,
                                       },
-                                      code_hash:
-                                        poolVersion === "pool"
-                                          ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
-                                          : undefined,
-                                    },
-                                    BigInt("300000000000000"),
-                                    BigInt(
-                                      parseUnits(
+                                      gas: "300000000000000",
+                                      deposit: parseUnits(
                                         requiredAccountBalance.poolCost.toString(),
                                         24
-                                      ).toString()
-                                    )
-                                  ),
+                                      ).toString(),
+                                    },
+                                  },
+                                  // actionCreators.functionCall(
+                                  //   "create_staking_pool",
+                                  //   {
+                                  //     staking_pool_id: poolId,
+                                  //     owner_id: accountId,
+                                  //     stake_public_key: validatorPublicKey,
+                                  //     reward_fee_fraction: {
+                                  //       numerator: rewardFee,
+                                  //       denominator: 100,
+                                  //     },
+                                  //     code_hash:
+                                  //       poolVersion === "pool"
+                                  //         ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
+                                  //         : undefined,
+                                  //   },
+                                  //   BigInt("300000000000000"),
+                                  //   BigInt(
+                                  //     parseUnits(
+                                  //       requiredAccountBalance.poolCost.toString(),
+                                  //       24
+                                  //     ).toString()
+                                  //   )
+                                  // ),
                                 ],
                               },
                             ],
@@ -741,14 +765,26 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                     receiverId: fullPoolId,
                                     signerId: accountId ?? undefined,
                                     actions: [
-                                      actionCreators.functionCall(
-                                        "update_staking_key",
-                                        {
-                                          stake_public_key: validatorPublicKey,
+                                      {
+                                        type: "FunctionCall",
+                                        params: {
+                                          methodName: "update_staking_key",
+                                          args: {
+                                            stake_public_key:
+                                              validatorPublicKey,
+                                          },
+                                          gas: "300000000000000",
+                                          deposit: "0",
                                         },
-                                        BigInt("300000000000000"),
-                                        BigInt("0")
-                                      ),
+                                      },
+                                      // actionCreators.functionCall(
+                                      //   "update_staking_key",
+                                      //   {
+                                      //     stake_public_key: validatorPublicKey,
+                                      //   },
+                                      //   BigInt("300000000000000"),
+                                      //   BigInt("0")
+                                      // ),
                                     ],
                                   },
                                 ],
@@ -781,17 +817,32 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                   receiverId: fullPoolId,
                                   signerId: accountId ?? undefined,
                                   actions: [
-                                    actionCreators.functionCall(
-                                      "update_reward_fee_fraction",
-                                      {
-                                        reward_fee_fraction: {
-                                          numerator: rewardFee,
-                                          denominator: 100,
+                                    {
+                                      type: "FunctionCall",
+                                      params: {
+                                        methodName:
+                                          "update_reward_fee_fraction",
+                                        args: {
+                                          reward_fee_fraction: {
+                                            numerator: rewardFee,
+                                            denominator: 100,
+                                          },
                                         },
+                                        gas: "300000000000000",
+                                        deposit: "0",
                                       },
-                                      BigInt("300000000000000"),
-                                      BigInt("0")
-                                    ),
+                                    },
+                                    // actionCreators.functionCall(
+                                    //   "update_reward_fee_fraction",
+                                    //   {
+                                    //     reward_fee_fraction: {
+                                    //       numerator: rewardFee,
+                                    //       denominator: 100,
+                                    //     },
+                                    //   },
+                                    //   BigInt("300000000000000"),
+                                    //   BigInt("0")
+                                    // ),
                                   ],
                                 },
                               ],
@@ -851,12 +902,24 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                               receiverId: fullPoolId,
                               signerId: accountId ?? undefined,
                               actions: [
-                                actionCreators.functionCall(
-                                  "deposit_and_stake",
-                                  {},
-                                  BigInt("300000000000000"),
-                                  BigInt(parseUnits(stakeTopUp, 24).toString())
-                                ),
+                                {
+                                  type: "FunctionCall",
+                                  params: {
+                                    methodName: "deposit_and_stake",
+                                    args: {},
+                                    gas: "300000000000000",
+                                    deposit: parseUnits(
+                                      stakeTopUp,
+                                      24
+                                    ).toString(),
+                                  },
+                                },
+                                // actionCreators.functionCall(
+                                //   "deposit_and_stake",
+                                //   {},
+                                //   BigInt("300000000000000"),
+                                //   BigInt(parseUnits(stakeTopUp, 24).toString())
+                                // ),
                               ],
                             },
                           ],
@@ -939,9 +1002,18 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                             receiverId: pingerAccountId,
                             signerId: accountId ?? undefined,
                             actions: [
-                              actionCreators.transfer(
-                                BigInt(parseUnits(pingerTopUp, 24).toString())
-                              ),
+                              {
+                                type: "Transfer",
+                                params: {
+                                  deposit: parseUnits(
+                                    pingerTopUp,
+                                    24
+                                  ).toString(),
+                                },
+                              },
+                              // actionCreators.transfer(
+                              //   BigInt(parseUnits(pingerTopUp, 24).toString())
+                              // ),
                             ],
                           },
                         ],

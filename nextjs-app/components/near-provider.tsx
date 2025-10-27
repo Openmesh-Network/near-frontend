@@ -1,11 +1,11 @@
 "use client";
 
-import type { NearConnector } from "@hot-labs/near-connect";
 import type {
-  SignMessageParams,
-  SignedMessage,
+  NearConnector,
   SignAndSendTransactionsParams,
-} from "@near-wallet-selector/core/src/lib/wallet/wallet.types";
+  SignedMessage,
+  SignMessageParams,
+} from "@hot-labs/near-connect";
 import type { providers } from "near-api-js";
 import {
   type FC,
@@ -73,9 +73,11 @@ export const NearWalletProvider: FC<{ children: ReactNode }> = ({
 
     try {
       const wallet = await newConnector.wallet();
-      const accountId = await wallet.getAddress();
-      if (accountId) {
-        setAccountId(accountId);
+      const account = await wallet
+        .getAccounts()
+        .then((accounts) => accounts.at(0));
+      if (account) {
+        setAccountId(account.accountId);
       }
     } catch {} // No existing wallet connection found
 
@@ -113,35 +115,7 @@ export const NearWalletProvider: FC<{ children: ReactNode }> = ({
       }
       const wallet = await connector.wallet();
       return wallet.signAndSendTransactions({
-        transactions: params.transactions.map((transaction) => {
-          return {
-            ...transaction,
-            actions: transaction.actions.map((action) => {
-              if (action.functionCall !== undefined) {
-                return {
-                  type: "FunctionCall",
-                  params: {
-                    ...action.functionCall,
-                    deposit: action.functionCall.deposit.toString(),
-                    gas: action.functionCall.gas.toString(),
-                  },
-                };
-              }
-
-              if (action.transfer !== undefined) {
-                return {
-                  type: "Transfer",
-                  params: {
-                    ...action.transfer,
-                    deposit: action.transfer.deposit.toString(),
-                  },
-                };
-              }
-
-              throw new Error("Unknown transaction action");
-            }),
-          };
-        }),
+        transactions: params.transactions,
       });
     },
     [connector]
