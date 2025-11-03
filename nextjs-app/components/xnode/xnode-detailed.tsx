@@ -24,9 +24,9 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
-import { useNearWallet } from "../near-provider";
+import { useNear } from "../near-provider";
 import { useQuery } from "@tanstack/react-query";
-import { connect, keyStores, providers } from "near-api-js";
+import { connect, keyStores } from "near-api-js";
 import { AccountView, CodeResult } from "near-api-js/lib/providers/provider";
 import { ScrollArea } from "../ui/scroll-area";
 import { formatUnits, parseUnits } from "viem";
@@ -196,12 +196,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     },
   });
 
-  const {
-    accountId,
-    connect: walletConnect,
-    disconnect: walletDisconnect,
-    signAndSendTransactions,
-  } = useNearWallet();
+  const { accountId, loading, modal, selector } = useNear();
   const fullPoolId = `${poolId}.${poolVersion}.near`;
   const { data: poolDeployed } = useQuery({
     queryKey: ["poolDeployed", near ?? "", fullPoolId],
@@ -652,7 +647,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           </SectionCard>
           <SectionCard title="Manage Pool">
             <div className="flex flex-col gap-3">
-              {accountId &&
+              {!loading &&
+                accountId &&
                 poolDeployed !== undefined &&
                 validatorPublicKey !== undefined &&
                 (!poolDeployed ? (
@@ -672,63 +668,43 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                       <Button
                         onClick={() => {
                           setBusy(true);
-                          signAndSendTransactions({
-                            transactions: [
-                              {
-                                receiverId: `${poolVersion}.near`,
-                                signerId: accountId,
-                                actions: [
+                          selector
+                            .wallet()
+                            .then((wallet) => {
+                              wallet.signAndSendTransactions({
+                                transactions: [
                                   {
-                                    type: "FunctionCall",
-                                    params: {
-                                      methodName: "create_staking_pool",
-                                      args: {
-                                        staking_pool_id: poolId,
-                                        owner_id: accountId,
-                                        stake_public_key: validatorPublicKey,
-                                        reward_fee_fraction: {
-                                          numerator: rewardFee,
-                                          denominator: 100,
+                                    receiverId: `${poolVersion}.near`,
+                                    signerId: accountId,
+                                    actions: [
+                                      actionCreators.functionCall(
+                                        "create_staking_pool",
+                                        {
+                                          staking_pool_id: poolId,
+                                          owner_id: accountId,
+                                          stake_public_key: validatorPublicKey,
+                                          reward_fee_fraction: {
+                                            numerator: rewardFee,
+                                            denominator: 100,
+                                          },
+                                          code_hash:
+                                            poolVersion === "pool"
+                                              ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
+                                              : undefined,
                                         },
-                                        code_hash:
-                                          poolVersion === "pool"
-                                            ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
-                                            : undefined,
-                                      },
-                                      gas: "300000000000000",
-                                      deposit: parseUnits(
-                                        requiredAccountBalance.poolCost.toString(),
-                                        24
-                                      ).toString(),
-                                    },
+                                        BigInt("300000000000000"),
+                                        BigInt(
+                                          parseUnits(
+                                            requiredAccountBalance.poolCost.toString(),
+                                            24
+                                          ).toString()
+                                        )
+                                      ),
+                                    ],
                                   },
-                                  // actionCreators.functionCall(
-                                  //   "create_staking_pool",
-                                  //   {
-                                  //     staking_pool_id: poolId,
-                                  //     owner_id: accountId,
-                                  //     stake_public_key: validatorPublicKey,
-                                  //     reward_fee_fraction: {
-                                  //       numerator: rewardFee,
-                                  //       denominator: 100,
-                                  //     },
-                                  //     code_hash:
-                                  //       poolVersion === "pool"
-                                  //         ? "AjD4YJaXgpiRdiArqnzyDi7Bkr1gJms9Z2w7Ev5esTKB"
-                                  //         : undefined,
-                                  //   },
-                                  //   BigInt("300000000000000"),
-                                  //   BigInt(
-                                  //     parseUnits(
-                                  //       requiredAccountBalance.poolCost.toString(),
-                                  //       24
-                                  //     ).toString()
-                                  //   )
-                                  // ),
                                 ],
-                              },
-                            ],
-                          })
+                              });
+                            })
                             .catch(console.error)
                             .finally(() => setBusy(false));
                         }}
@@ -759,36 +735,29 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                           <Button
                             onClick={() => {
                               setBusy(true);
-                              signAndSendTransactions({
-                                transactions: [
-                                  {
-                                    receiverId: fullPoolId,
-                                    signerId: accountId ?? undefined,
-                                    actions: [
+                              selector
+                                .wallet()
+                                .then((wallet) => {
+                                  wallet.signAndSendTransactions({
+                                    transactions: [
                                       {
-                                        type: "FunctionCall",
-                                        params: {
-                                          methodName: "update_staking_key",
-                                          args: {
-                                            stake_public_key:
-                                              validatorPublicKey,
-                                          },
-                                          gas: "300000000000000",
-                                          deposit: "0",
-                                        },
+                                        receiverId: fullPoolId,
+                                        signerId: accountId ?? undefined,
+                                        actions: [
+                                          actionCreators.functionCall(
+                                            "update_staking_key",
+                                            {
+                                              stake_public_key:
+                                                validatorPublicKey,
+                                            },
+                                            BigInt("300000000000000"),
+                                            BigInt("0")
+                                          ),
+                                        ],
                                       },
-                                      // actionCreators.functionCall(
-                                      //   "update_staking_key",
-                                      //   {
-                                      //     stake_public_key: validatorPublicKey,
-                                      //   },
-                                      //   BigInt("300000000000000"),
-                                      //   BigInt("0")
-                                      // ),
                                     ],
-                                  },
-                                ],
-                              })
+                                  });
+                                })
                                 .catch(console.error)
                                 .then(() => refetchDeployedPoolSettings())
                                 .finally(() => setBusy(false));
@@ -811,42 +780,31 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         <Button
                           onClick={() => {
                             setBusy(true);
-                            signAndSendTransactions({
-                              transactions: [
-                                {
-                                  receiverId: fullPoolId,
-                                  signerId: accountId ?? undefined,
-                                  actions: [
+                            selector
+                              .wallet()
+                              .then((wallet) => {
+                                wallet.signAndSendTransactions({
+                                  transactions: [
                                     {
-                                      type: "FunctionCall",
-                                      params: {
-                                        methodName:
+                                      receiverId: fullPoolId,
+                                      signerId: accountId ?? undefined,
+                                      actions: [
+                                        actionCreators.functionCall(
                                           "update_reward_fee_fraction",
-                                        args: {
-                                          reward_fee_fraction: {
-                                            numerator: rewardFee,
-                                            denominator: 100,
+                                          {
+                                            reward_fee_fraction: {
+                                              numerator: rewardFee,
+                                              denominator: 100,
+                                            },
                                           },
-                                        },
-                                        gas: "300000000000000",
-                                        deposit: "0",
-                                      },
+                                          BigInt("300000000000000"),
+                                          BigInt("0")
+                                        ),
+                                      ],
                                     },
-                                    // actionCreators.functionCall(
-                                    //   "update_reward_fee_fraction",
-                                    //   {
-                                    //     reward_fee_fraction: {
-                                    //       numerator: rewardFee,
-                                    //       denominator: 100,
-                                    //     },
-                                    //   },
-                                    //   BigInt("300000000000000"),
-                                    //   BigInt("0")
-                                    // ),
                                   ],
-                                },
-                              ],
-                            })
+                                });
+                              })
                               .catch(console.error)
                               .then(() => refetchDeployedPoolSettings())
                               .finally(() => setBusy(false));
@@ -896,34 +854,28 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     <Button
                       onClick={() => {
                         setBusy(true);
-                        signAndSendTransactions({
-                          transactions: [
-                            {
-                              receiverId: fullPoolId,
-                              signerId: accountId ?? undefined,
-                              actions: [
+                        selector
+                          .wallet()
+                          .then((wallet) => {
+                            wallet.signAndSendTransactions({
+                              transactions: [
                                 {
-                                  type: "FunctionCall",
-                                  params: {
-                                    methodName: "deposit_and_stake",
-                                    args: {},
-                                    gas: "300000000000000",
-                                    deposit: parseUnits(
-                                      stakeTopUp,
-                                      24
-                                    ).toString(),
-                                  },
+                                  receiverId: fullPoolId,
+                                  signerId: accountId ?? undefined,
+                                  actions: [
+                                    actionCreators.functionCall(
+                                      "deposit_and_stake",
+                                      {},
+                                      BigInt("300000000000000"),
+                                      BigInt(
+                                        parseUnits(stakeTopUp, 24).toString()
+                                      )
+                                    ),
+                                  ],
                                 },
-                                // actionCreators.functionCall(
-                                //   "deposit_and_stake",
-                                //   {},
-                                //   BigInt("300000000000000"),
-                                //   BigInt(parseUnits(stakeTopUp, 24).toString())
-                                // ),
                               ],
-                            },
-                          ],
-                        })
+                            });
+                          })
                           .catch(console.error)
                           .then(() => refetchTotalPoolStake())
                           .finally(() => setBusy(false));
@@ -941,7 +893,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 <div className="overflow-x-auto">
                   <Button
                     className="px-2 py-0.5 h-auto"
-                    onClick={() => walletDisconnect().catch(console.error)}
+                    onClick={() =>
+                      selector.wallet().then((wallet) => wallet.signOut())
+                    }
                   >
                     Disconnect <span className="break-words">{accountId}</span>
                     {connectedAccountBalance && (
@@ -962,7 +916,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 <div>
                   <Button
                     className="px-2 py-0.5 h-auto"
-                    onClick={() => walletConnect().catch(console.error)}
+                    onClick={() => modal.show()}
                   >
                     Connect NEAR wallet
                   </Button>
@@ -996,28 +950,25 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                   <Button
                     onClick={() => {
                       setBusy(true);
-                      signAndSendTransactions({
-                        transactions: [
-                          {
-                            receiverId: pingerAccountId,
-                            signerId: accountId ?? undefined,
-                            actions: [
+                      selector
+                        .wallet()
+                        .then((wallet) => {
+                          wallet.signAndSendTransactions({
+                            transactions: [
                               {
-                                type: "Transfer",
-                                params: {
-                                  deposit: parseUnits(
-                                    pingerTopUp,
-                                    24
-                                  ).toString(),
-                                },
+                                receiverId: pingerAccountId,
+                                signerId: accountId ?? undefined,
+                                actions: [
+                                  actionCreators.transfer(
+                                    BigInt(
+                                      parseUnits(pingerTopUp, 24).toString()
+                                    )
+                                  ),
+                                ],
                               },
-                              // actionCreators.transfer(
-                              //   BigInt(parseUnits(pingerTopUp, 24).toString())
-                              // ),
                             ],
-                          },
-                        ],
-                      })
+                          });
+                        })
                         .catch(console.error)
                         .then(() => refetchPingerAccountBalance())
                         .finally(() => setBusy(false));

@@ -1,155 +1,159 @@
 "use client";
 
-import type {
-  NearConnector,
-  SignAndSendTransactionsParams,
-  SignedMessage,
-  SignMessageParams,
-} from "@hot-labs/near-connect";
-import type { providers } from "near-api-js";
-import {
-  type FC,
-  type ReactNode,
-  createContext,
+import "@near-wallet-selector/modal-ui/styles.css";
+
+import { setupCoin98Wallet } from "@near-wallet-selector/coin98-wallet";
+import type { AccountState, WalletSelector } from "@near-wallet-selector/core";
+import { setupWalletSelector } from "@near-wallet-selector/core";
+import { setupHereWallet } from "@near-wallet-selector/here-wallet";
+import { setupMeteorWallet } from "@near-wallet-selector/meteor-wallet";
+import { setupMeteorWalletApp } from "@near-wallet-selector/meteor-wallet-app";
+import { setupNarwallets } from "@near-wallet-selector/narwallets";
+import type { WalletSelectorModal } from "@near-wallet-selector/modal-ui";
+import { setupModal } from "@near-wallet-selector/modal-ui";
+import { setupNightly } from "@near-wallet-selector/nightly";
+import { setupSender } from "@near-wallet-selector/sender";
+import { setupWalletConnect } from "@near-wallet-selector/wallet-connect";
+import { setupMyNearWallet } from "@near-wallet-selector/my-near-wallet";
+import { setupLedger } from "@near-wallet-selector/ledger";
+import { setupNearMobileWallet } from "@near-wallet-selector/near-mobile-wallet";
+import { setupOKXWallet } from "@near-wallet-selector/okx-wallet";
+
+import type { ReactNode } from "react";
+import React, {
   useCallback,
   useContext,
-  useMemo,
+  useEffect,
   useState,
+  useMemo,
 } from "react";
+import { distinctUntilChanged, map } from "rxjs";
 import { metadata, projectId } from "./web3-provider";
 
-interface NearWalletContextValue {
-  connector: NearConnector | null;
-  accountId: string | null;
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
-  signMessage: (message: SignMessageParams) => Promise<{
-    signatureData: SignedMessage;
-    signedData: SignMessageParams;
-  }>;
-  signAndSendTransactions: (
-    params: SignAndSendTransactionsParams
-  ) => Promise<providers.FinalExecutionOutcome[]>;
+declare global {
+  interface Window {
+    selector: WalletSelector;
+    modal: WalletSelectorModal;
+  }
 }
 
-const NearWalletContext = createContext<NearWalletContextValue | null>(null);
+interface WalletSelectorContextValue {
+  selector: WalletSelector;
+  modal: WalletSelectorModal;
+  accounts: Array<AccountState>;
+  accountId: string | null;
+  loading: boolean;
+}
 
-export const NearWalletProvider: FC<{ children: ReactNode }> = ({
-  children,
-}) => {
-  const [connector, setConnector] = useState<NearConnector | null>(null);
-  const [accountId, setAccountId] = useState<string | null>(null);
+const WalletSelectorContext =
+  React.createContext<WalletSelectorContextValue | null>(null);
+
+const CONTRACT_ID = "";
+
+export const NearProvider: React.FC<{
+  children: ReactNode;
+}> = ({ children }) => {
+  const [selector, setSelector] = useState<WalletSelector | null>(null);
+  const [modal, setModal] = useState<WalletSelectorModal | null>(null);
+  const [accounts, setAccounts] = useState<Array<AccountState>>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   const init = useCallback(async () => {
-    if (connector) {
-      return connector;
-    }
+    const _selector = await setupWalletSelector({
+      network: "mainnet",
+      modules: [
+        setupMyNearWallet(),
+        setupLedger(),
+        setupSender(),
+        setupNightly(),
+        setupMeteorWallet(),
+        setupMeteorWalletApp({ contractId: CONTRACT_ID }),
+        setupOKXWallet(),
+        setupNarwallets(),
+        setupHereWallet(),
+        setupCoin98Wallet(),
+        setupWalletConnect({
+          projectId: projectId,
+          metadata: metadata,
+        }),
+        setupNearMobileWallet(),
+      ],
+    });
+    const _modal = setupModal(_selector, {
+      contractId: CONTRACT_ID,
+    });
+    const state = _selector.store.getState();
+    setAccounts(state.accounts);
 
-    const { NearConnector } = await import(
-      "@hot-labs/near-connect/build/NearConnector"
-    );
+    // this is added for debugging purpose only
+    // for more information (https://github.com/near/wallet-selector/pull/764#issuecomment-1498073367)
+    window.selector = _selector;
+    window.modal = _modal;
 
-    let newConnector: NearConnector | null = null;
+    setSelector(_selector);
+    setModal(_modal);
+    setLoading(false);
+  }, []);
 
-    try {
-      newConnector = new NearConnector({
-        network: "mainnet",
-        walletConnect: {
-          projectId,
-          metadata,
-        },
-      });
-    } catch (err) {
+  useEffect(() => {
+    init().catch((err) => {
       console.error(err);
+      alert("Failed to Initialize wallet selector");
+    });
+  }, [init]);
+
+  useEffect(() => {
+    if (!selector) {
       return;
     }
 
-    newConnector.on("wallet:signOut", () => setAccountId(null));
-    newConnector.on("wallet:signIn", (t) => {
-      setAccountId(t.accounts?.[0]?.accountId ?? null);
+    const subscription = selector.store.observable
+      .pipe(
+        map((state) => state.accounts),
+        distinctUntilChanged()
+      )
+      .subscribe((nextAccounts) => {
+        console.log("Accounts Update", nextAccounts);
+
+        setAccounts(nextAccounts);
+      });
+
+    const onHideSubscription = modal!.on("onHide", ({ hideReason }) => {
+      console.log(`The reason for hiding the modal ${hideReason}`);
     });
 
-    setConnector(newConnector);
-
-    try {
-      const wallet = await newConnector.wallet();
-      const account = await wallet
-        .getAccounts()
-        .then((accounts) => accounts.at(0));
-      if (account) {
-        setAccountId(account.accountId);
-      }
-    } catch {} // No existing wallet connection found
-
-    return newConnector;
-  }, [connector]);
-
-  const connect = useCallback(async () => {
-    const newConnector = connector ?? (await init());
-    if (newConnector) {
-      await newConnector.connect();
-    }
-  }, [connector, init]);
-
-  const disconnect = useCallback(async () => {
-    if (!connector) return;
-    await connector.disconnect();
-  }, [connector]);
-
-  const signMessage = useCallback(
-    async (message: SignMessageParams) => {
-      if (!connector) {
-        throw new Error("Connector not initialized");
-      }
-      const wallet = await connector.wallet();
-      const signatureData = await wallet.signMessage(message);
-      return { signatureData, signedData: message };
-    },
-    [connector]
-  );
-
-  const signAndSendTransactions = useCallback(
-    async (params: SignAndSendTransactionsParams) => {
-      if (!connector) {
-        throw new Error("Connector not initialized");
-      }
-      const wallet = await connector.wallet();
-      return wallet.signAndSendTransactions({
-        transactions: params.transactions,
-      });
-    },
-    [connector]
-  );
-
-  const value = useMemo<NearWalletContextValue>(() => {
-    return {
-      connector,
-      accountId,
-      connect,
-      disconnect,
-      signMessage,
-      signAndSendTransactions,
+    return () => {
+      subscription.unsubscribe();
+      onHideSubscription.remove();
     };
-  }, [
-    connector,
-    accountId,
-    connect,
-    disconnect,
-    signMessage,
-    signAndSendTransactions,
-  ]);
+  }, [selector, modal]);
+
+  const walletSelectorContextValue = useMemo<WalletSelectorContextValue>(
+    () => ({
+      selector: selector!,
+      modal: modal!,
+      accounts,
+      accountId: accounts.find((account) => account.active)?.accountId || null,
+      loading,
+    }),
+    [selector, modal, accounts, loading]
+  );
 
   return (
-    <NearWalletContext.Provider value={value}>
+    <WalletSelectorContext.Provider value={walletSelectorContextValue}>
       {children}
-    </NearWalletContext.Provider>
+    </WalletSelectorContext.Provider>
   );
 };
 
-export function useNearWallet() {
-  const ctx = useContext(NearWalletContext);
-  if (!ctx) {
-    throw new Error("useNearWallet must be used within a NearWalletProvider");
+export function useNear() {
+  const context = useContext(WalletSelectorContext);
+
+  if (!context) {
+    throw new Error(
+      "useWalletSelector must be used within a WalletSelectorContextProvider"
+    );
   }
-  return ctx;
+
+  return context;
 }
