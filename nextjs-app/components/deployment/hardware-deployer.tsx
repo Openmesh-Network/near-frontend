@@ -8,7 +8,7 @@ import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 import { ComboBox } from "../ui/combobox";
 import { Separator } from "../ui/separator";
-import { MapPin, TriangleAlert } from "lucide-react";
+import { Hourglass, MapPin, TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import Link from "next/link";
 import { Input } from "../ui/input";
@@ -26,6 +26,13 @@ import { toast } from "sonner";
 import { useAddress } from "@/hooks/useAddress";
 import { LoginXnode, LoginXnodeParams } from "../xnode/login";
 import { useSetSettings, useSettings, Xnode } from "../context/settings";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
 
 export default function HardwareDeployer({
   hardware,
@@ -115,6 +122,16 @@ export default function HardwareDeployer({
               Authorization: `Bearer ${debouncedApiKey}`,
             },
           });
+        } else if (hardware.providerName === "CherryServers") {
+          await axios.get("/api/cherry-servers/rewrite", {
+            params: {
+              path: "v1/user",
+              method: "GET",
+            },
+            headers: {
+              Authorization: `Bearer ${debouncedApiKey}`,
+            },
+          });
         }
         return true;
       } catch (err) {
@@ -126,6 +143,8 @@ export default function HardwareDeployer({
   const [login, setLogin] = useState<LoginXnodeParams | undefined>(undefined);
   const settings = useSettings();
   const setSettings = useSetSettings();
+
+  const [busy, setBusy] = useState<boolean>(false);
 
   return (
     <>
@@ -267,6 +286,8 @@ export default function HardwareDeployer({
                       ? "https://docs.vultr.com/create-a-limited-subuser-profile-with-api-access-at-vultr"
                       : hardware.providerName === "Hetzner"
                       ? "https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/"
+                      : hardware.providerName === "CherryServers"
+                      ? "https://api.cherryservers.com/doc/#section/Authentication"
                       : "#"
                   }
                   target="_blank"
@@ -316,44 +337,47 @@ export default function HardwareDeployer({
                 setLogin({
                   message: `Xnode Auth authenticate ${messageDomain} at ${messageTimestamp}`,
                   onSigned(signature) {
+                    setBusy(true);
+                    setLogin(undefined);
                     provisionHardware({
                       hardware,
                       paymentPeriod,
                       debouncedApiKey,
                       extraStorage,
                       owner: address,
-                    }).then((res) => {
-                      if (res.type === "success") {
-                        const importedXnode = {
-                          insecure: res.ipAddress,
-                          owner: address,
-                          deploymentAuth: res.deploymentAuth,
-                          loginArgs: {
-                            user: address,
-                            signature,
-                            timestamp: messageTimestamp.toString(),
-                          },
-                        } as Xnode;
+                    })
+                      .then((res) => {
+                        if (res.type === "success") {
+                          const importedXnode = {
+                            insecure: res.ipAddress,
+                            owner: address,
+                            deploymentAuth: res.deploymentAuth,
+                            loginArgs: {
+                              user: address,
+                              signature,
+                              timestamp: messageTimestamp.toString(),
+                            },
+                          } as Xnode;
 
-                        setSettings({
-                          ...settings,
-                          xnodes: settings.xnodes.concat([importedXnode]),
-                        });
+                          setSettings({
+                            ...settings,
+                            xnodes: settings.xnodes.concat([importedXnode]),
+                          });
 
-                        onDeployed({
-                          ipAddress: res.ipAddress,
-                          deploymentAuth: res.deploymentAuth,
-                          owner: address,
-                        });
-                        setStep("summary");
-                      } else {
-                        toast("Error", {
-                          description: res.errorMessage,
-                          style: { backgroundColor: "red" },
-                        });
-                      }
-                      setLogin(undefined);
-                    });
+                          onDeployed({
+                            ipAddress: res.ipAddress,
+                            deploymentAuth: res.deploymentAuth,
+                            owner: address,
+                          });
+                          setStep("summary");
+                        } else {
+                          toast("Error", {
+                            description: res.errorMessage,
+                            style: { backgroundColor: "red" },
+                          });
+                        }
+                      })
+                      .finally(() => setBusy(false));
                   },
                   onCancel() {
                     setLogin(undefined);
@@ -367,8 +391,18 @@ export default function HardwareDeployer({
           </Button>
         </div>
       </div>
-
       {login && <LoginXnode {...login} />}
+      <AlertDialog open={busy}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Performing action...</AlertDialogTitle>
+            <AlertDialogDescription className="flex gap-1 place-items-center">
+              <Hourglass />
+              <span>Please wait. Do not refresh the page.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

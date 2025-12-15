@@ -20,7 +20,9 @@ import { Slider } from "@/components/ui/slider";
 const STEP_MIN = 1;
 const STEP_MAX = 1000;
 const PRICE_MAX = 100000;
-const HIGHLIGHTED = [{ productName: "pro.md.amd", providerName: "Hivelocity" }];
+const HIGHLIGHTED = [
+  { productName: "Cloud VPS 6 (Gen 2)", providerName: "CherryServers" },
+];
 
 type HardwareSelectorProps = {
   specs?: Specs;
@@ -70,22 +72,35 @@ export default function HardwareSelector({
     placeholderData: keepPreviousData,
     staleTime: 60 * 1000, // 1 min
   });
+  const { data: cherryServersData, isFetching: cherryServersFetching } =
+    useQuery({
+      queryKey: ["inventory", "CherryServers"],
+      queryFn: async () => {
+        return fetch("/api/cherry-servers/inventory")
+          .then((res) => res.json())
+          .then((res) => res as HardwareProduct[]);
+      },
+      placeholderData: keepPreviousData,
+      staleTime: 60 * 1000, // 1 min
+    });
 
   const rawProviderData = useMemo(
     () =>
       ([] as HardwareProduct[])
         .concat(hivelocityData ?? [])
         .concat(vultrData ?? [])
-        .concat(hetznerData ?? []),
-    [hivelocityData, vultrData, hetznerData]
+        .concat(hetznerData ?? [])
+        .concat(cherryServersData ?? []),
+    [hivelocityData, vultrData, hetznerData, cherryServersData]
   );
   const providersLoading = useMemo(
     () => [
       { name: "Hivelocity", loaded: !hivelocityFetching },
       { name: "Vultr", loaded: !vultrFetching },
       { name: "Hetzner", loaded: !hetznerFetching },
+      { name: "Cherry Servers", loaded: !cherryServersFetching },
     ],
-    [hivelocityFetching, vultrFetching, hetznerFetching]
+    [hivelocityFetching, vultrFetching, hetznerFetching, cherryServersFetching]
   );
   const providersFetching = useMemo(
     () => providersLoading.some((provider) => !provider.loaded),
@@ -280,7 +295,7 @@ export default function HardwareSelector({
         .reduce(
           (prev, cur) => {
             const id = `${cur.providerName}_${cur.id.split("_")[0]}_${
-              cur.available
+              cur.available > 0 ? "available" : "unavailable"
             }_${cur.price.monthly}_${cur.summary}`; // Products with the same id are assumed to be the same
             if (!Object.hasOwn(prev, id)) {
               prev[id] = {};

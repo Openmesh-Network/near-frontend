@@ -49,7 +49,6 @@ export function useProvision() {
     | { type: "error"; errorMessage: string }
     | { type: "success"; ipAddress: string; deploymentAuth: string }
   > {
-    const existingInstance = ""; // Specify an existing instance to redeploy (instead of provision a new server)
     setProvisioning(true);
     try {
       const cloudInit = getCloudInit({ owner });
@@ -65,22 +64,17 @@ export function useProvision() {
             params: {
               path: `v2/${
                 hardware.type === "VPS" ? "compute" : "bare-metal-devices"
-              }/${existingInstance}`,
-              method: existingInstance ? "PUT" : "POST",
+              }/`,
+              method: "POST",
               body: JSON.stringify({
                 osName: `Ubuntu 24.04${
                   hardware.type === "VPS" ? " (VPS)" : ""
                 }`,
                 hostname: "xnode.openmesh.network",
                 script: cloudInit,
-                period: existingInstance
-                  ? undefined
-                  : paymentPeriod === "yearly"
-                  ? "annually"
-                  : paymentPeriod,
-                locationName: existingInstance ? undefined : dataCenter,
-                productId: existingInstance ? undefined : productId,
-                forceReload: existingInstance ? true : undefined,
+                period: paymentPeriod === "yearly" ? "annually" : paymentPeriod,
+                locationName: dataCenter,
+                productId: productId,
               }),
             },
             headers: {
@@ -109,10 +103,10 @@ export function useProvision() {
           ipAddress = updatedMachine.primaryIp;
         }
 
-        if (extraStorage > 0 && !existingInstance) {
+        if (extraStorage > 0) {
           await axios.get("/api/hivelocity/rewrite", {
             params: {
-              path: `v2/vps/volume`,
+              path: "v2/vps/volume",
               method: "POST",
               body: JSON.stringify({
                 deviceId: machine.deviceId,
@@ -133,11 +127,11 @@ export function useProvision() {
             params: {
               path: `v2/${
                 hardware.type === "VPS" ? "instances" : "bare-metals"
-              }${existingInstance ? `/${existingInstance}` : ""}`, // Vultr API does not like trailing slashes
-              method: existingInstance ? "PATCH" : "POST",
+              }`,
+              method: "POST",
               body: JSON.stringify({
-                region: existingInstance ? undefined : regionId,
-                plan: existingInstance ? undefined : planId,
+                region: regionId,
+                plan: planId,
                 os_id: 2284, // {"id":2284,"name":"Ubuntu 24.04 LTS x64","arch":"x64","family":"ubuntu"}
                 user_data: Buffer.from(cloudInit).toString("base64"),
                 hostname: "xnode.openmesh.network",
@@ -186,8 +180,8 @@ export function useProvision() {
         const machine = await axios
           .get("/api/hetzner/rewrite", {
             params: {
-              path: `v1/servers/${existingInstance}`,
-              method: existingInstance ? "PUT" : "POST",
+              path: "v1/servers/",
+              method: "POST",
               body: JSON.stringify({
                 name: "xnode.openmesh.network",
                 location: locationName,
@@ -234,6 +228,123 @@ export function useProvision() {
                 }
             );
           ipAddress = updatedMachine.public_net?.ipv4?.ip as string;
+        }
+      } else if (hardware.providerName === "CherryServers") {
+        const teams = await axios
+          .get("/api/cherry-servers/rewrite", {
+            params: {
+              path: "v1/teams",
+              method: "GET",
+            },
+            headers: {
+              Authorization: `Bearer ${debouncedApiKey}`,
+            },
+          })
+          .then((res) => res.data as { id: number; name: string }[]);
+        const team =
+          teams.find((team) => team.name == "Openmesh Network") ??
+          (await axios
+            .get("/api/cherry-servers/rewrite", {
+              params: {
+                path: "v1/teams",
+                method: "POST",
+                body: JSON.stringify({
+                  name: "Openmesh Network",
+                }),
+              },
+              headers: {
+                Authorization: `Bearer ${debouncedApiKey}`,
+              },
+            })
+            .then(
+              (res) =>
+                res.data as {
+                  id: number;
+                  name: string;
+                }
+            ));
+        if (!team) {
+          return { type: "error", errorMessage: "No Team" };
+        }
+        const projects = await axios
+          .get("/api/cherry-servers/rewrite", {
+            params: {
+              path: `v1/teams/${team.id}/projects`,
+              method: "GET",
+            },
+            headers: {
+              Authorization: `Bearer ${debouncedApiKey}`,
+            },
+          })
+          .then((res) => res.data as { id: number; name: string }[]);
+        const project =
+          projects.find((project) => project.name == "Xnode") ??
+          (await axios
+            .get("/api/cherry-servers/rewrite", {
+              params: {
+                path: `v1/teams/${team.id}/projects`,
+                method: "POST",
+                body: JSON.stringify({
+                  name: "Xnode",
+                }),
+              },
+              headers: {
+                Authorization: `Bearer ${debouncedApiKey}`,
+              },
+            })
+            .then(
+              (res) =>
+                res.data as {
+                  id: number;
+                  name: string;
+                }
+            ));
+        if (!project) {
+          return { type: "error", errorMessage: "No Project" };
+        }
+
+        const productInfo = hardware.id.split("_");
+        const productSlug = productInfo[0];
+        const regionSlug = productInfo[1];
+        const machine = await axios
+          .get("/api/cherry-servers/rewrite", {
+            params: {
+              path: `v1/projects/${project.id}/servers`,
+              method: "POST",
+              body: JSON.stringify({
+                plan: productSlug,
+                image: "ubuntu_24_04_64bit",
+                region: regionSlug,
+                user_data: Buffer.from(cloudInit).toString("base64"),
+                cycle: paymentPeriod === "yearly" ? "annually" : paymentPeriod,
+              }),
+            },
+            headers: {
+              Authorization: `Bearer ${debouncedApiKey}`,
+            },
+          })
+          .then(
+            (res) =>
+              res.data as {
+                id: number;
+              }
+          );
+        deploymentAuth = `servers/${machine.id}`;
+
+        while (!ipAddress || ipAddress === "0.0.0.0") {
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const updatedMachine = await axios
+            .get("/api/cherry-servers/rewrite", {
+              params: {
+                path: `v1/${deploymentAuth}/ips?type=primary-ip`,
+                method: "GET",
+              },
+              headers: {
+                Authorization: `Bearer ${debouncedApiKey}`,
+              },
+            })
+            .then((res) => res.data as { address: string }[]);
+          ipAddress = updatedMachine.at(0)?.address as string;
         }
       }
 
@@ -308,22 +419,6 @@ export function useProvision() {
           },
           headers: {
             "X-API-KEY": debouncedApiKey,
-          },
-        });
-      } else if (provider === "Vultr") {
-        await axios.get("/api/vultr/rewrite", {
-          params: {
-            path: `v2/${url}`,
-            method: "PATCH",
-            body: JSON.stringify({
-              os_id: 2284, // {"id":2284,"name":"Ubuntu 24.04 LTS x64","arch":"x64","family":"ubuntu"}
-              user_data: Buffer.from(cloudInit).toString("base64"),
-              hostname: "xnode.openmesh.network",
-              label: "Xnode",
-            }),
-          },
-          headers: {
-            Authorization: `Bearer ${debouncedApiKey}`,
           },
         });
       }
