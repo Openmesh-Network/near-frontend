@@ -181,6 +181,10 @@ export default function HardwareReset({
                   ? "https://developers.hivelocity.net/docs/api-keys"
                   : provider === "Vultr"
                   ? "https://docs.vultr.com/create-a-limited-subuser-profile-with-api-access-at-vultr"
+                  : provider === "Hetzner"
+                  ? "https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/"
+                  : provider === "CherryServers"
+                  ? "https://portal.cherryservers.com/settings/api-keys"
                   : "#"
               }
               target="_blank"

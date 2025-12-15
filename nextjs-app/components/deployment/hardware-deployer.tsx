@@ -287,7 +287,7 @@ export default function HardwareDeployer({
                       : hardware.providerName === "Hetzner"
                       ? "https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/"
                       : hardware.providerName === "CherryServers"
-                      ? "https://api.cherryservers.com/doc/#section/Authentication"
+                      ? "https://portal.cherryservers.com/settings/api-keys"
                       : "#"
                   }
                   target="_blank"
