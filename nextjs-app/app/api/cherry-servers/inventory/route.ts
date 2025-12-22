@@ -33,7 +33,7 @@ interface CherryServersProduct {
     id: number;
     unit: "Hourly" | "Monthly" | "Quarterly" | "Semiannually" | "Annually";
     price: number;
-    currency: "EUR";
+    currency: "EUR" | "USD";
     taxed: false;
   }[];
   available_regions: {
@@ -58,16 +58,11 @@ export async function GET(_: NextRequest) {
   const rawInventory: CherryServersProduct[] = [];
   await Promise.all([
     fetch(
-      "https://api.cherryservers.com/v1/plans?fields=plan,specs,pricing,region"
+      "https://api.cherryservers.com/v1/plans?fields=plan,specs,pricing,region&currency=USD"
     )
       .then((res) => res.json())
       .then((data) => rawInventory.push(...data)),
   ]);
-  const eurToUsd = await fetch(
-    `https://api.frankfurter.dev/v1/latest?base=EUR&symbols=USD`
-  )
-    .then((resp) => resp.json())
-    .then((data) => data.rates.USD as number);
   const inventory: HardwareProduct[] = rawInventory.flatMap((product) => {
     return product.available_regions.map((region) => {
       const id = `${product.slug}_${region.slug}`;
@@ -84,6 +79,7 @@ export async function GET(_: NextRequest) {
         (price) => price.unit === "Quarterly"
       );
       let yearly = product.pricing.find((price) => price.unit === "Annually");
+      const discount = product.slug === "B2-6-6gb-100s-shared" ? 1 - 0.23 : 1;
       return {
         type: product.type.includes("vps") ? "VPS" : "Bare Metal",
         available: region.stock_qty,
@@ -109,10 +105,10 @@ export async function GET(_: NextRequest) {
             parseInt(product.specs.bandwidth.name.replace("TB", "")) * 1024,
         },
         price: {
-          hourly: hourly ? hourly.price * 1.27 * eurToUsd : undefined, // adjust for VAT (assumed 27%)
-          monthly: monthly ? monthly.price * 1.27 * eurToUsd : undefined, // adjust for VAT (assumed 27%)
-          quarterly: quarterly ? quarterly.price * 1.27 * eurToUsd : undefined, // adjust for VAT (assumed 27%)
-          yearly: yearly ? yearly.price * 1.27 * eurToUsd : undefined, // adjust for VAT (assumed 27%)
+          hourly: hourly ? hourly.price * 1.27 : undefined, // adjust for VAT (assumed 27%)
+          monthly: monthly ? monthly.price * 1.27 * discount : undefined, // adjust for VAT (assumed 27%)
+          quarterly: quarterly ? quarterly.price * 1.27 : undefined, // adjust for VAT (assumed 27%)
+          yearly: yearly ? yearly.price * 1.27 : undefined, // adjust for VAT (assumed 27%)
         },
         productName: product.name,
         providerName: "CherryServers",

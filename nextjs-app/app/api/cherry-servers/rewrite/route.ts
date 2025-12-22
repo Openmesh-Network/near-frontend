@@ -11,11 +11,21 @@ export async function GET(req: NextRequest) {
     const method = req.nextUrl.searchParams.get("method") || "GET";
 
     const body = req.nextUrl.searchParams.get("body");
+    const parsedBody = body ? JSON.parse(body) : undefined;
+    if (
+      method === "POST" &&
+      path.startsWith("v1/projects/") &&
+      (path.endsWith("/servers") || path.endsWith("/servers/")) &&
+      parsedBody?.plan === "B2-6-6gb-100s-shared" &&
+      parsedBody?.cycle === "monthly"
+    ) {
+      parsedBody.discount = process.env.CHERRYSERVERS_DISCOUNT_CODE;
+    }
 
     const res = await axios({
       method: method,
       url: `https://api.cherryservers.com/${path}`,
-      data: body ? JSON.parse(body) : undefined,
+      data: parsedBody,
       headers: {
         Authorization: req.headers.get("Authorization"),
       },
