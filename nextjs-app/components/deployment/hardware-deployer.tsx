@@ -214,8 +214,8 @@ export default function HardwareDeployer({
                     ? new Intl.NumberFormat("en-US", {
                         style: "currency",
                         currency: "USD",
-                        minimumFractionDigits: 0,
                         maximumFractionDigits: 5,
+                        maximumSignificantDigits: 5,
                       }).format(hardware.price[paymentPeriod])
                     : "?"}
                   <span className="text-xl">
@@ -245,7 +245,16 @@ export default function HardwareDeployer({
               you press this button a new machine will be ordered.
             </span>
             <span className="mt-2">
-              {`${hardware.productName} | $${hardware.price[paymentPeriod]}/${
+              {`${hardware.productName} | ${
+                hardware.price[paymentPeriod]
+                  ? new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                      maximumFractionDigits: 5,
+                      maximumSignificantDigits: 5,
+                    }).format(hardware.price[paymentPeriod])
+                  : "?"
+              }/${
                 paymentPeriod.substring(
                   0,
                   paymentPeriod.length - 2
