@@ -351,24 +351,32 @@ export function usePrepareXnode({
   const { mutateAsync: execute } = useProcessExecute();
   const restartNearContainer = useMemo(
     () => async () => {
-      if (!session) {
+      if (!session || !existingNearContainerSettings) {
         return;
       }
 
-      return execute({
-        session,
-        path: {
-          scope: `container:${containerId}`,
-          process: "near-validator.service",
-        },
-        data: "Restart",
+      return createNearContainer({
+        poolId: existingNearContainerSettings.poolId,
+        poolVersion: existingNearContainerSettings.poolVersion,
+        pinger: existingNearContainerSettings.pinger,
+        update: false,
       })
+        .then(() =>
+          execute({
+            session,
+            path: {
+              scope: `container:${containerId}`,
+              process: "near-validator.service",
+            },
+            data: "Restart",
+          })
+        )
         .then((request) =>
           awaitRequest({ request: { session, path: request } })
         )
         .catch(console.error);
     },
-    [session, containerId]
+    [session, containerId, createNearContainer, existingNearContainerSettings]
   );
 
   const resetNearData = useMemo(
