@@ -243,6 +243,7 @@ export function useProvision() {
           .then((res) => res.data as { id: number; name: string }[]);
         const team =
           teams.find((team) => team.name == "Openmesh Network") ??
+          teams.at(0) ??
           (await axios
             .get("/api/cherry-servers/rewrite", {
               params: {
@@ -279,6 +280,7 @@ export function useProvision() {
           .then((res) => res.data as { id: number; name: string }[]);
         const project =
           projects.find((project) => project.name == "Xnode") ??
+          projects.at(0) ??
           (await axios
             .get("/api/cherry-servers/rewrite", {
               params: {
