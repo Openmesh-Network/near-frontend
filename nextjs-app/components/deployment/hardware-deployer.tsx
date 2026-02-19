@@ -61,7 +61,7 @@ export default function HardwareDeployer({
         await fetch(`/api/${hardware.providerName.toLowerCase()}/storage`)
           .then((res) => res.json())
           .then((data) => data as AdditionalStorage[])
-          .catch(() => [])
+          .catch(() => []),
       );
     },
   });
@@ -209,25 +209,33 @@ export default function HardwareDeployer({
                   />{" "}
                   price
                 </span>
-                <span className="mt-1 text-4xl font-bold text-primary">
-                  {hardware.price[paymentPeriod]
-                    ? new Intl.NumberFormat("en-US", {
-                        style: "currency",
-                        currency: "USD",
-                        maximumFractionDigits: 5,
-                        maximumSignificantDigits: 5,
-                      }).format(hardware.price[paymentPeriod])
-                    : "?"}
-                  <span className="text-xl">
-                    /
-                    {
-                      paymentPeriod.substring(
-                        0,
-                        paymentPeriod.length - 2
-                      ) /* remove ly */
-                    }
+                <div className="flex flex-col gap-1 place-items-center">
+                  <span className="mt-1 text-4xl font-bold text-primary">
+                    {hardware.price[paymentPeriod]
+                      ? new Intl.NumberFormat("en-US", {
+                          style: "currency",
+                          currency: "USD",
+                          maximumFractionDigits: 5,
+                          maximumSignificantDigits: 5,
+                        }).format(hardware.price[paymentPeriod])
+                      : "?"}
+                    <span className="text-xl">
+                      /
+                      {
+                        paymentPeriod.substring(
+                          0,
+                          paymentPeriod.length - 2,
+                        ) /* remove ly */
+                      }
+                    </span>
                   </span>
-                </span>
+                  {hardware.providerName === "CherryServers" && (
+                    <span className="text-sm ml-1 text-muted-foreground">
+                      {" "}
+                      + VAT for EU residents
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -257,9 +265,9 @@ export default function HardwareDeployer({
               }/${
                 paymentPeriod.substring(
                   0,
-                  paymentPeriod.length - 2
+                  paymentPeriod.length - 2,
                 ) /* remove ly */
-              }`}
+              }${hardware.providerName === "CherryServers" ? " + VAT for EU residents" : ""}`}
             </span>
             <div className="mt-2 flex flex-col rounded border p-4">
               <span className="text-lg font-semibold">
@@ -275,8 +283,8 @@ export default function HardwareDeployer({
                     validApiKey === false
                       ? "border-red-600"
                       : validApiKey === true
-                      ? "border-green-500"
-                      : ""
+                        ? "border-green-500"
+                        : ""
                   }
                   onChange={(e) => setApiKey(e.target.value)}
                   type="password"
@@ -292,12 +300,12 @@ export default function HardwareDeployer({
                     hardware.providerName === "Hivelocity"
                       ? "https://developers.hivelocity.net/docs/api-keys"
                       : hardware.providerName === "Vultr"
-                      ? "https://docs.vultr.com/create-a-limited-subuser-profile-with-api-access-at-vultr"
-                      : hardware.providerName === "Hetzner"
-                      ? "https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/"
-                      : hardware.providerName === "CherryServers"
-                      ? "https://portal.cherryservers.com/settings/api-keys"
-                      : "#"
+                        ? "https://docs.vultr.com/create-a-limited-subuser-profile-with-api-access-at-vultr"
+                        : hardware.providerName === "Hetzner"
+                          ? "https://docs.hetzner.com/cloud/api/getting-started/generating-api-token/"
+                          : hardware.providerName === "CherryServers"
+                            ? "https://portal.cherryservers.com/settings/api-keys"
+                            : "#"
                   }
                   target="_blank"
                   className="underline underline-offset-2"

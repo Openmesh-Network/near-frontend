@@ -58,7 +58,7 @@ export async function GET(_: NextRequest) {
   const rawInventory: CherryServersProduct[] = [];
   await Promise.all([
     fetch(
-      "https://api.cherryservers.com/v1/plans?fields=plan,specs,pricing,region&currency=USD"
+      "https://api.cherryservers.com/v1/plans?fields=plan,specs,pricing,region&currency=USD",
     )
       .then((res) => res.json())
       .then((data) => rawInventory.push(...data)),
@@ -70,13 +70,13 @@ export async function GET(_: NextRequest) {
         new Array(storage.count).fill({
           capacity: storage.unit === "TB" ? storage.size * 1024 : storage.size,
           type: storage.type,
-        })
+        }),
       );
       const city = region.location.split(", ").at(1);
       let hourly = product.pricing.find((price) => price.unit === "Hourly");
       let monthly = product.pricing.find((price) => price.unit === "Monthly");
       let quarterly = product.pricing.find(
-        (price) => price.unit === "Quarterly"
+        (price) => price.unit === "Quarterly",
       );
       let yearly = product.pricing.find((price) => price.unit === "Annually");
       const discount = product.slug === "B2-6-6gb-100s-shared" ? 1 - 0.23 : 1;
@@ -105,10 +105,10 @@ export async function GET(_: NextRequest) {
             parseInt(product.specs.bandwidth.name.replace("TB", "")) * 1024,
         },
         price: {
-          hourly: hourly ? hourly.price * 1.27 : undefined, // adjust for VAT (assumed 27%)
-          monthly: monthly ? monthly.price * 1.27 * discount : undefined, // adjust for VAT (assumed 27%)
-          quarterly: quarterly ? quarterly.price * 1.27 : undefined, // adjust for VAT (assumed 27%)
-          yearly: yearly ? yearly.price * 1.27 : undefined, // adjust for VAT (assumed 27%)
+          hourly: hourly ? hourly.price : undefined,
+          monthly: monthly ? monthly.price * discount : undefined,
+          quarterly: quarterly ? quarterly.price : undefined,
+          yearly: yearly ? yearly.price : undefined,
         },
         productName: product.name,
         providerName: "CherryServers",
