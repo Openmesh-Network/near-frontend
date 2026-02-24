@@ -64,64 +64,71 @@ export async function GET(_: NextRequest) {
       .then((data) => rawInventory.push(...data)),
   ]);
   const inventory: HardwareProduct[] = rawInventory.flatMap((product) => {
-    return product.available_regions.map((region) => {
-      const id = `${product.slug}_${region.slug}`;
-      const drives = product.specs.storage.flatMap((storage) =>
-        new Array(storage.count).fill({
-          capacity: storage.unit === "TB" ? storage.size * 1024 : storage.size,
-          type: storage.type,
-        }),
-      );
-      const city = region.location.split(", ").at(1);
-      let hourly = product.pricing.find((price) => price.unit === "Hourly");
-      let monthly = product.pricing.find((price) => price.unit === "Monthly");
-      let quarterly = product.pricing.find(
-        (price) => price.unit === "Quarterly",
-      );
-      let yearly = product.pricing.find((price) => price.unit === "Annually");
-      const discount = product.slug === "B2-6-6gb-100s-shared" ? 1 - 0.23 : 1;
-      return {
-        type: product.type.includes("vps") ? "VPS" : "Bare Metal",
-        available: region.stock_qty,
-        cpu: {
-          cores: product.specs.cpus.cores,
-          ghz:
-            product.specs.cpus.frequency !== 0
-              ? product.specs.cpus.frequency
-              : undefined,
-          name: product.specs.cpus.name.includes("vCores")
-            ? undefined
-            : product.specs.cpus.name,
-        },
-        id: id,
-        location: city
-          ? `${city}, ${region.region_iso_2}`
-          : region.region_iso_2,
-        network: {
-          speed: product.specs.nics.name.endsWith("Mbps")
-            ? parseInt(product.specs.nics.name.replace("Mbps", "")) / 1000
-            : parseInt(product.specs.nics.name.replace("Gbps", "")),
-          max_usage:
-            parseInt(product.specs.bandwidth.name.replace("TB", "")) * 1024,
-        },
-        price: {
-          hourly: hourly ? hourly.price : undefined,
-          monthly: monthly ? monthly.price * discount : undefined,
-          quarterly: quarterly ? quarterly.price : undefined,
-          yearly: yearly ? yearly.price : undefined,
-        },
-        productName: product.name,
-        providerName: "CherryServers",
-        ram: {
-          capacity:
-            product.specs.memory.unit === "TB"
-              ? product.specs.memory.total * 1024
-              : product.specs.memory.total,
-        },
-        storage: drives,
-        gpu: [],
-      };
-    });
+    return product.available_regions
+      .filter(
+        (region) =>
+          product.name !== "Cloud VPS 6 (Gen 2)" ||
+          region.region_iso_2 !== "SG",
+      )
+      .map((region) => {
+        const id = `${product.slug}_${region.slug}`;
+        const drives = product.specs.storage.flatMap((storage) =>
+          new Array(storage.count).fill({
+            capacity:
+              storage.unit === "TB" ? storage.size * 1024 : storage.size,
+            type: storage.type,
+          }),
+        );
+        const city = region.location.split(", ").at(1);
+        let hourly = product.pricing.find((price) => price.unit === "Hourly");
+        let monthly = product.pricing.find((price) => price.unit === "Monthly");
+        let quarterly = product.pricing.find(
+          (price) => price.unit === "Quarterly",
+        );
+        let yearly = product.pricing.find((price) => price.unit === "Annually");
+        const discount = product.slug === "B2-6-6gb-100s-shared" ? 1 - 0.23 : 1;
+        return {
+          type: product.type.includes("vps") ? "VPS" : "Bare Metal",
+          available: region.stock_qty,
+          cpu: {
+            cores: product.specs.cpus.cores,
+            ghz:
+              product.specs.cpus.frequency !== 0
+                ? product.specs.cpus.frequency
+                : undefined,
+            name: product.specs.cpus.name.includes("vCores")
+              ? undefined
+              : product.specs.cpus.name,
+          },
+          id: id,
+          location: city
+            ? `${city}, ${region.region_iso_2}`
+            : region.region_iso_2,
+          network: {
+            speed: product.specs.nics.name.endsWith("Mbps")
+              ? parseInt(product.specs.nics.name.replace("Mbps", "")) / 1000
+              : parseInt(product.specs.nics.name.replace("Gbps", "")),
+            max_usage:
+              parseInt(product.specs.bandwidth.name.replace("TB", "")) * 1024,
+          },
+          price: {
+            hourly: hourly ? hourly.price : undefined,
+            monthly: monthly ? monthly.price * discount : undefined,
+            quarterly: quarterly ? quarterly.price : undefined,
+            yearly: yearly ? yearly.price : undefined,
+          },
+          productName: product.name,
+          providerName: "CherryServers",
+          ram: {
+            capacity:
+              product.specs.memory.unit === "TB"
+                ? product.specs.memory.total * 1024
+                : product.specs.memory.total,
+          },
+          storage: drives,
+          gpu: [],
+        };
+      });
   });
   return Response.json(inventory);
 }
