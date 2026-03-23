@@ -49,7 +49,7 @@ export function usePrepareXnode({
     queryFn: async () => {
       return await axios
         .get(
-          "https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/flake.nix"
+          "https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/flake.nix",
         )
         .then((res) => res.data as string)
         .then((data) => {
@@ -65,14 +65,21 @@ export function usePrepareXnode({
     flake: "github:Openmesh-Network/xnode-manager",
   });
 
+  const { data: latestXnodeAuth } = useInfoFlake({
+    session,
+    flake: "github:Openmesh-Network/xnode-auth",
+  });
+
   const osUpdateNeeded = useMemo(
     () =>
-      os && latestOsConfig && latestXnodeManager
+      os && latestOsConfig && latestXnodeManager && latestXnodeAuth
         ? os.flake !== latestOsConfig ||
           latestXnodeManager.revision !==
-            JSON.parse(os.flake_lock).nodes["xnode-manager"].locked.rev
+            JSON.parse(os.flake_lock).nodes["xnode-manager"].locked.rev ||
+          latestXnodeAuth.revision !==
+            JSON.parse(os.flake_lock).nodes["xnode-auth"].locked.rev
         : undefined,
-    [os, latestOsConfig, latestXnodeManager]
+    [os, latestOsConfig, latestXnodeManager],
   );
   const { mutateAsync: setOS } = useOsSet();
   const osUpdate = useMemo(
@@ -93,11 +100,11 @@ export function usePrepareXnode({
         },
       })
         .then((request) =>
-          awaitRequest({ request: { session, path: request } })
+          awaitRequest({ request: { session, path: request } }),
         )
         .catch(console.error);
     },
-    [session, latestOsConfig]
+    [session, latestOsConfig],
   );
 
   const { data: containers } = useConfigContainers({ session });
@@ -197,11 +204,11 @@ export function usePrepareXnode({
           },
         })
           .then((request) =>
-            awaitRequest({ request: { session, path: request } })
+            awaitRequest({ request: { session, path: request } }),
           )
           .catch(console.error);
       },
-    [session, containerId]
+    [session, containerId],
   );
 
   const { data: validatorKeyFile } = useFileReadFile({
@@ -289,7 +296,7 @@ export function usePrepareXnode({
             : new Promise((resolve) => setTimeout(resolve, 0))
         ).then(() => createNearContainer({ poolId, poolVersion, pinger }));
       },
-    [session, containerId, createNearContainer, existingNearContainerSettings]
+    [session, containerId, createNearContainer, existingNearContainerSettings],
   );
 
   const { mutateAsync: removeContainer } = useConfigContainerRemove();
@@ -304,11 +311,11 @@ export function usePrepareXnode({
         path: { container: containerId },
       })
         .then((request) =>
-          awaitRequest({ request: { session, path: request } })
+          awaitRequest({ request: { session, path: request } }),
         )
         .catch(console.error);
     },
-    [session, containerId]
+    [session, containerId],
   );
 
   const { data: latestNearValidatorVersion } = useQuery({
@@ -316,7 +323,7 @@ export function usePrepareXnode({
     queryFn: async () => {
       return await axios
         .get(
-          "/github-forward/repos/Openmesh-Network/near-validator/commits/main"
+          "/github-forward/repos/Openmesh-Network/near-validator/commits/main",
         )
         .then((res) => res.data)
         .then((data) => data.sha);
@@ -345,7 +352,7 @@ export function usePrepareXnode({
         update: true,
       });
     },
-    [session, containerId, createNearContainer, existingNearContainerSettings]
+    [session, containerId, createNearContainer, existingNearContainerSettings],
   );
 
   const { mutateAsync: execute } = useProcessExecute();
@@ -369,14 +376,14 @@ export function usePrepareXnode({
               process: "near-validator.service",
             },
             data: "Restart",
-          })
+          }),
         )
         .then((request) =>
-          awaitRequest({ request: { session, path: request } })
+          awaitRequest({ request: { session, path: request } }),
         )
         .catch(console.error);
     },
-    [session, containerId, createNearContainer, existingNearContainerSettings]
+    [session, containerId, createNearContainer, existingNearContainerSettings],
   );
 
   const resetNearData = useMemo(
@@ -396,7 +403,7 @@ export function usePrepareXnode({
         .catch(console.error)
         .then(() => restartNearContainer());
     },
-    [session, containerId]
+    [session, containerId],
   );
 
   const missingDependencies = [
@@ -407,8 +414,8 @@ export function usePrepareXnode({
   const ready = missingDependencies.some((b) => b === true)
     ? false
     : missingDependencies.some((b) => b === undefined)
-    ? undefined
-    : true;
+      ? undefined
+      : true;
 
   return {
     os,
