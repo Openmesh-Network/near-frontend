@@ -49,7 +49,7 @@ export function usePrepareXnode({
     queryFn: async () => {
       return await axios
         .get(
-          "https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/flake.nix",
+          "https://raw.githubusercontent.com/Openmesh-Network/xnodeos/v1/config/flake.nix",
         )
         .then((res) => res.data as string)
         .then((data) => {
@@ -60,26 +60,19 @@ export function usePrepareXnode({
     },
   });
 
-  const { data: latestXnodeManager } = useInfoFlake({
+  const { data: latestXnodeOS } = useInfoFlake({
     session,
-    flake: "github:Openmesh-Network/xnode-manager",
-  });
-
-  const { data: latestXnodeAuth } = useInfoFlake({
-    session,
-    flake: "github:Openmesh-Network/xnode-auth",
+    flake: "github:Openmesh-Network/xnodeos/v1",
   });
 
   const osUpdateNeeded = useMemo(
     () =>
-      os && latestOsConfig && latestXnodeManager && latestXnodeAuth
+      os && latestOsConfig && latestXnodeOS
         ? os.flake !== latestOsConfig ||
-          latestXnodeManager.revision !==
-            JSON.parse(os.flake_lock).nodes["xnode-manager"].locked.rev ||
-          latestXnodeAuth.revision !==
-            JSON.parse(os.flake_lock).nodes["xnode-auth"].locked.rev
+          latestXnodeOS.revision !==
+            JSON.parse(os.flake_lock).nodes["xnodeos"].locked.rev
         : undefined,
-    [os, latestOsConfig, latestXnodeManager],
+    [os, latestOsConfig, latestXnodeOS],
   );
   const { mutateAsync: setOS } = useOsSet();
   const osUpdate = useMemo(
@@ -144,9 +137,9 @@ export function usePrepareXnode({
             settings: {
               flake: `{
   inputs = {
-    xnode-manager.url = "github:Openmesh-Network/xnode-manager";
+    xnodeos.url = "github:Openmesh-Network/xnodeos/v1";
+    nixpkgs.follows = "xnodeos/nixpkgs";
     near-validator.url = "github:Openmesh-Network/near-validator";
-    nixpkgs.follows = "near-validator/nixpkgs";
   };
 
   nixConfig = {
@@ -164,7 +157,7 @@ export function usePrepareXnode({
         inherit inputs;
       };
       modules = [
-        inputs.xnode-manager.nixosModules.container
+        inputs.xnodeos.nixosModules.container
         {
           services.xnode-container.xnode-config = {
             host-platform = ./xnode-config/host-platform;

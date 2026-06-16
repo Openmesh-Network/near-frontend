@@ -3,7 +3,7 @@ import { useState } from "react";
 import axios, { AxiosError } from "axios";
 
 function getCloudInit({ owner }: { owner: string }) {
-  return `#cloud-config\nruncmd:\n - export XNODE_OWNER="${owner}" && curl https://raw.githubusercontent.com/Openmesh-Network/xnode-manager/main/os/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
+  return `#cloud-config\nruncmd:\n - export XNODE_OWNER="${owner}" && VERSION="v1.0.0" && curl https://raw.githubusercontent.com/Openmesh-Network/xnodeos/main/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
 }
 
 function getErrorMessage(err: any) {
