@@ -3,7 +3,7 @@ import { useState } from "react";
 import axios, { AxiosError } from "axios";
 
 function getCloudInit({ owner }: { owner: string }) {
-  return `#cloud-config\nruncmd:\n - export XNODE_OWNER="${owner}" && VERSION="v1.0.0" && curl https://raw.githubusercontent.com/Openmesh-Network/xnodeos/main/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
+  return `#cloud-config\nruncmd:\n - export XNODE_OWNER="${owner}" && export VERSION="v1.0.0" && curl https://raw.githubusercontent.com/Openmesh-Network/xnodeos/main/install.sh | bash 2>&1 | tee /tmp/xnodeos.log`;
 }
 
 function getErrorMessage(err: any) {
@@ -146,7 +146,7 @@ export function useProvision() {
             (res) =>
               (hardware.type === "VPS"
                 ? res.data.instance
-                : res.data.bare_metal) as { id: number; main_ip: string }
+                : res.data.bare_metal) as { id: number; main_ip: string },
           );
         ipAddress = machine.main_ip;
         deploymentAuth = `${
@@ -169,7 +169,7 @@ export function useProvision() {
               (res) =>
                 (hardware.type === "VPS"
                   ? res.data.instance
-                  : res.data.bare_metal) as { id: number; main_ip: string }
+                  : res.data.bare_metal) as { id: number; main_ip: string },
             );
           ipAddress = updatedMachine.main_ip;
         }
@@ -203,7 +203,7 @@ export function useProvision() {
               res.data.server as {
                 id: number;
                 public_net?: { ipv4?: { ip?: string } };
-              }
+              },
           );
         ipAddress = machine.public_net?.ipv4?.ip as string;
         deploymentAuth = `servers/${machine.id}`;
@@ -225,7 +225,7 @@ export function useProvision() {
                 res.data.server as {
                   id: number;
                   public_net?: { ipv4?: { ip?: string } };
-                }
+                },
             );
           ipAddress = updatedMachine.public_net?.ipv4?.ip as string;
         }
@@ -262,7 +262,7 @@ export function useProvision() {
                 res.data as {
                   id: number;
                   name: string;
-                }
+                },
             ));
         if (!team) {
           return { type: "error", errorMessage: "No Team" };
@@ -299,7 +299,7 @@ export function useProvision() {
                 res.data as {
                   id: number;
                   name: string;
-                }
+                },
             ));
         if (!project) {
           return { type: "error", errorMessage: "No Project" };
@@ -329,7 +329,7 @@ export function useProvision() {
             (res) =>
               res.data as {
                 id: number;
-              }
+              },
           );
         deploymentAuth = `servers/${machine.id}`;
 
