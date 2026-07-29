@@ -71,7 +71,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const settings = useSettings();
   const xnode = useMemo(
     () => settings.xnodes.find((x) => getBaseUrl({ xnode: x }) === baseUrl),
-    [settings.xnodes, baseUrl]
+    [settings.xnodes, baseUrl],
   );
 
   const { replace } = useRouter();
@@ -150,7 +150,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   const scrollLogToBottom = useMemo(() => {
     return () => {
       const scrollArea = logsScrollAreaRef.current?.querySelector(
-        "[data-radix-scroll-area-viewport]"
+        "[data-radix-scroll-area-viewport]",
       );
       if (scrollArea) {
         scrollArea.scrollTop = scrollArea.scrollHeight;
@@ -241,7 +241,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
   });
   const requiredAccountBalance = useMemo(() => {
     let poolCost = 0;
-    const gasFee = 0.5;
+    const gasFee = 0.2;
 
     if (poolVersion === "pool") {
       poolCost = 4;
@@ -279,16 +279,16 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
               account_id: fullPoolId,
               method_name,
               args_base64: "",
-            })
-          )
+            }),
+          ),
         );
         return {
           owner_id: String.fromCharCode(...responses[0].result).replaceAll(
             '"',
-            ""
+            "",
           ),
           stake_public_key: String.fromCharCode(
-            ...responses[1].result
+            ...responses[1].result,
           ).replaceAll('"', ""),
           reward_fee_fraction: upgradablePool
             ? (
@@ -333,8 +333,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
       return parseFloat(
         formatUnits(
           BigInt(String.fromCharCode(...response.result).replaceAll('"', "")),
-          24
-        )
+          24,
+        ),
       );
     },
   });
@@ -392,7 +392,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           },
           {
             responseType: "json",
-          }
+          },
         )
         .then((res) => res.data)
         .then(
@@ -407,7 +407,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                 num_produced_chunks: number;
                 num_produced_endorsements: number;
               }[];
-            }
+            },
         );
       return stats;
     },
@@ -418,7 +418,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     }
 
     return validatorStats.current_validators.find(
-      (v) => v.account_id === fullPoolId
+      (v) => v.account_id === fullPoolId,
     );
   }, [fullPoolId, validatorStats]);
   const [stakeTopUp, setStakeTopUp] = useState<string>("0");
@@ -696,9 +696,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                         BigInt(
                                           parseUnits(
                                             requiredAccountBalance.poolCost.toString(),
-                                            24
-                                          ).toString()
-                                        )
+                                            24,
+                                          ).toString(),
+                                        ),
                                       ),
                                     ],
                                   },
@@ -751,7 +751,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                                 validatorPublicKey,
                                             },
                                             BigInt("300000000000000"),
-                                            BigInt("0")
+                                            BigInt("0"),
                                           ),
                                         ],
                                       },
@@ -798,7 +798,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                             },
                                           },
                                           BigInt("300000000000000"),
-                                          BigInt("0")
+                                          BigInt("0"),
                                         ),
                                       ],
                                     },
@@ -868,8 +868,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                       {},
                                       BigInt("300000000000000"),
                                       BigInt(
-                                        parseUnits(stakeTopUp, 24).toString()
-                                      )
+                                        parseUnits(stakeTopUp, 24).toString(),
+                                      ),
                                     ),
                                   ],
                                 },
@@ -961,8 +961,8 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                 actions: [
                                   actionCreators.transfer(
                                     BigInt(
-                                      parseUnits(pingerTopUp, 24).toString()
-                                    )
+                                      parseUnits(pingerTopUp, 24).toString(),
+                                    ),
                                   ),
                                 ],
                               },
@@ -1110,10 +1110,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                     ) : (
                       <Ansi key={i}>
                         {Buffer.from(log.message.Bytes.output).toString(
-                          "utf-8"
+                          "utf-8",
                         )}
                       </Ansi>
-                    )
+                    ),
                   )}
                 </div>
               </ScrollArea>
