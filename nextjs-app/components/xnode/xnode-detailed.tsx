@@ -339,10 +339,10 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     },
   });
 
-  const { data: ownerPoolAccount, refetch: refetchOwnerPoolAccount } = useQuery(
-    {
+  const { data: accountStakingBalance, refetch: refetchAccountStakingBalance } =
+    useQuery({
       queryKey: [
-        "ownerPoolAccount",
+        "accountStakingBalance",
         near ?? "",
         poolDeployed ?? false,
         fullPoolId,
@@ -383,8 +383,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
           return undefined;
         }
       },
-    },
-  );
+    });
 
   const { data: totalPoolStake, refetch: refetchTotalPoolStake } = useQuery({
     queryKey: ["totalPoolStake", near ?? "", poolDeployed ?? false, fullPoolId],
@@ -891,7 +890,9 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         <Status
                           type={stakingPaused ? "warning" : "success"}
                           text={
-                            stakingPaused ? "Staking paused." : "Staking active."
+                            stakingPaused
+                              ? "Staking paused."
+                              : "Staking active."
                           }
                         />
                         <Button
@@ -941,17 +942,17 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         </Button>
                       </RowDiv>
                     )}
-                    {ownerPoolAccount && (
+                    {accountStakingBalance && (
                       <RowDiv>
                         <span>Your stake:</span>
                         <span>
-                          {ownerPoolAccount.staked.toFixed(2)} staked /{" "}
-                          {ownerPoolAccount.unstaked.toFixed(2)} unstaked
+                          {accountStakingBalance.staked.toFixed(2)} staked /{" "}
+                          {accountStakingBalance.unstaked.toFixed(2)} unstaked
                         </span>
                       </RowDiv>
                     )}
                     {(stakingPaused === false ||
-                      (ownerPoolAccount?.staked ?? 0) > 0) && (
+                      (accountStakingBalance?.staked ?? 0) > 0) && (
                       <RowDiv>
                         <Button
                           variant="destructive"
@@ -992,7 +993,7 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                                   .then(() =>
                                     Promise.all([
                                       refetchStakingPaused(),
-                                      refetchOwnerPoolAccount(),
+                                      refetchAccountStakingBalance(),
                                       refetchTotalPoolStake(),
                                     ]),
                                   )
@@ -1006,49 +1007,56 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         </Button>
                       </RowDiv>
                     )}
-                    {ownerPoolAccount && ownerPoolAccount.unstaked > 0 && (
-                      <RowDiv>
-                        <Status
-                          type={ownerPoolAccount.canWithdraw ? "success" : "warning"}
-                          text={
-                            ownerPoolAccount.canWithdraw
-                              ? "Unstaked funds ready to withdraw."
-                              : "Unstaked funds not yet withdrawable (~4 epochs)."
-                          }
-                        />
-                        <Button
-                          onClick={() => {
-                            setBusy(true);
-                            selector
-                              .wallet()
-                              .then(async (wallet) => {
-                                await wallet.signAndSendTransactions({
-                                  transactions: [
-                                    {
-                                      receiverId: fullPoolId,
-                                      signerId: accountId ?? undefined,
-                                      actions: [
-                                        actionCreators.functionCall(
-                                          "withdraw_all",
-                                          {},
-                                          BigInt("100000000000000"),
-                                          BigInt("0"),
-                                        ),
-                                      ],
-                                    },
-                                  ],
-                                });
-                              })
-                              .catch(console.error)
-                              .then(() => refetchOwnerPoolAccount())
-                              .finally(() => setBusy(false));
-                          }}
-                          disabled={busy || !ownerPoolAccount.canWithdraw}
-                        >
-                          Withdraw
-                        </Button>
-                      </RowDiv>
-                    )}
+                    {accountStakingBalance &&
+                      accountStakingBalance.unstaked > 0 && (
+                        <RowDiv>
+                          <Status
+                            type={
+                              accountStakingBalance.canWithdraw
+                                ? "success"
+                                : "warning"
+                            }
+                            text={
+                              accountStakingBalance.canWithdraw
+                                ? "Unstaked funds ready to withdraw."
+                                : "Unstaked funds not yet withdrawable (~4 epochs)."
+                            }
+                          />
+                          <Button
+                            onClick={() => {
+                              setBusy(true);
+                              selector
+                                .wallet()
+                                .then(async (wallet) => {
+                                  await wallet.signAndSendTransactions({
+                                    transactions: [
+                                      {
+                                        receiverId: fullPoolId,
+                                        signerId: accountId ?? undefined,
+                                        actions: [
+                                          actionCreators.functionCall(
+                                            "withdraw_all",
+                                            {},
+                                            BigInt("100000000000000"),
+                                            BigInt("0"),
+                                          ),
+                                        ],
+                                      },
+                                    ],
+                                  });
+                                })
+                                .catch(console.error)
+                                .then(() => refetchAccountStakingBalance())
+                                .finally(() => setBusy(false));
+                            }}
+                            disabled={
+                              busy || !accountStakingBalance.canWithdraw
+                            }
+                          >
+                            Withdraw
+                          </Button>
+                        </RowDiv>
+                      )}
                   </>
                 ) : (
                   <>
