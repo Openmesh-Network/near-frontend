@@ -315,6 +315,76 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
     setRewardFee(deployedPoolSettings.reward_fee_fraction.numerator);
   }, [deployedPoolSettings?.reward_fee_fraction.numerator]);
 
+  const { data: stakingPaused, refetch: refetchStakingPaused } = useQuery({
+    queryKey: ["stakingPaused", near ?? "", poolDeployed ?? false, fullPoolId],
+    enabled: !!near && poolDeployed,
+    refetchInterval: 30 * 1000, // 30s
+    queryFn: async () => {
+      if (!near) {
+        return undefined;
+      }
+
+      try {
+        const response = await near.connection.provider.query<CodeResult>({
+          request_type: "call_function",
+          finality: "final",
+          account_id: fullPoolId,
+          method_name: "is_staking_paused",
+          args_base64: "",
+        });
+        return JSON.parse(String.fromCharCode(...response.result)) as boolean;
+      } catch {
+        return undefined;
+      }
+    },
+  });
+
+  const { data: accountStakingBalance, refetch: refetchAccountStakingBalance } =
+    useQuery({
+      queryKey: [
+        "accountStakingBalance",
+        near ?? "",
+        poolDeployed ?? false,
+        fullPoolId,
+        accountId ?? "",
+      ],
+      enabled: !!near && poolDeployed && !!accountId,
+      refetchInterval: 30 * 1000, // 30s
+      queryFn: async () => {
+        if (!near || !accountId) {
+          return undefined;
+        }
+
+        try {
+          const response = await near.connection.provider.query<CodeResult>({
+            request_type: "call_function",
+            finality: "final",
+            account_id: fullPoolId,
+            method_name: "get_account",
+            args_base64: Buffer.from(
+              JSON.stringify({ account_id: accountId }),
+            ).toString("base64"),
+          });
+          const account = JSON.parse(
+            String.fromCharCode(...response.result),
+          ) as {
+            unstaked_balance: string;
+            staked_balance: string;
+            can_withdraw: boolean;
+          };
+          return {
+            staked: parseFloat(formatUnits(BigInt(account.staked_balance), 24)),
+            unstaked: parseFloat(
+              formatUnits(BigInt(account.unstaked_balance), 24),
+            ),
+            canWithdraw: account.can_withdraw,
+          };
+        } catch {
+          return undefined;
+        }
+      },
+    });
+
   const { data: totalPoolStake, refetch: refetchTotalPoolStake } = useQuery({
     queryKey: ["totalPoolStake", near ?? "", poolDeployed ?? false, fullPoolId],
     enabled: !!near && poolDeployed,
@@ -815,6 +885,178 @@ export function XnodeDetailed({ domain }: { domain?: string }) {
                         </Button>
                       </RowDiv>
                     )}
+                    {stakingPaused !== undefined && (
+                      <RowDiv>
+                        <Status
+                          type={stakingPaused ? "warning" : "success"}
+                          text={
+                            stakingPaused
+                              ? "Staking paused."
+                              : "Staking active."
+                          }
+                        />
+                        <Button
+                          variant={stakingPaused ? "default" : "destructive"}
+                          onClick={() => {
+                            const method = stakingPaused
+                              ? "resume_staking"
+                              : "pause_staking";
+                            setConfirmAction({
+                              name: stakingPaused
+                                ? "Resume staking"
+                                : "Pause staking",
+                              description: stakingPaused
+                                ? "This will resume staking on the pool. The pool will be proposed as a validator again from the next epoch. Make sure the NEAR node is running and fully synced first."
+                                : "This will pause staking on the pool so it leaves the validator set (takes effect after ~2-3 epochs). Keep the NEAR node running until the pool is no longer in the current validator set, then stop it.",
+                              execute: () => {
+                                setBusy(true);
+                                selector
+                                  .wallet()
+                                  .then(async (wallet) => {
+                                    await wallet.signAndSendTransactions({
+                                      transactions: [
+                                        {
+                                          receiverId: fullPoolId,
+                                          signerId: accountId ?? undefined,
+                                          actions: [
+                                            actionCreators.functionCall(
+                                              method,
+                                              {},
+                                              BigInt("300000000000000"),
+                                              BigInt("0"),
+                                            ),
+                                          ],
+                                        },
+                                      ],
+                                    });
+                                  })
+                                  .catch(console.error)
+                                  .then(() => refetchStakingPaused())
+                                  .finally(() => setBusy(false));
+                              },
+                            });
+                          }}
+                          disabled={busy}
+                        >
+                          {stakingPaused ? "Resume staking" : "Pause staking"}
+                        </Button>
+                      </RowDiv>
+                    )}
+                    {accountStakingBalance && (
+                      <RowDiv>
+                        <span>Your stake:</span>
+                        <span>
+                          {accountStakingBalance.staked.toFixed(2)} staked /{" "}
+                          {accountStakingBalance.unstaked.toFixed(2)} unstaked
+                        </span>
+                      </RowDiv>
+                    )}
+                    {(stakingPaused === false ||
+                      (accountStakingBalance?.staked ?? 0) > 0) && (
+                      <RowDiv>
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            setConfirmAction({
+                              name: "STOP my node forever",
+                              description:
+                                "This will, in a single transaction: (1) pause staking on the pool so it leaves the validator set, and (2) unstake ALL of your staked NEAR including accrued rewards. Your funds become withdrawable after ~4 epochs (~2 days); come back and click Withdraw. IMPORTANT: keep the node running until the pool no longer appears in the current validator set, otherwise you risk being kicked and losing rewards. Delegators other than the owner are NOT unstaked and must unstake themselves.",
+                              execute: () => {
+                                setBusy(true);
+                                selector
+                                  .wallet()
+                                  .then(async (wallet) => {
+                                    await wallet.signAndSendTransactions({
+                                      transactions: [
+                                        {
+                                          receiverId: fullPoolId,
+                                          signerId: accountId ?? undefined,
+                                          actions: [
+                                            actionCreators.functionCall(
+                                              "pause_staking",
+                                              {},
+                                              BigInt("100000000000000"),
+                                              BigInt("0"),
+                                            ),
+                                            actionCreators.functionCall(
+                                              "unstake_all",
+                                              {},
+                                              BigInt("100000000000000"),
+                                              BigInt("0"),
+                                            ),
+                                          ],
+                                        },
+                                      ],
+                                    });
+                                  })
+                                  .catch(console.error)
+                                  .then(() =>
+                                    Promise.all([
+                                      refetchStakingPaused(),
+                                      refetchAccountStakingBalance(),
+                                      refetchTotalPoolStake(),
+                                    ]),
+                                  )
+                                  .finally(() => setBusy(false));
+                              },
+                            });
+                          }}
+                          disabled={busy}
+                        >
+                          STOP my node forever
+                        </Button>
+                      </RowDiv>
+                    )}
+                    {accountStakingBalance &&
+                      accountStakingBalance.unstaked > 0 && (
+                        <RowDiv>
+                          <Status
+                            type={
+                              accountStakingBalance.canWithdraw
+                                ? "success"
+                                : "warning"
+                            }
+                            text={
+                              accountStakingBalance.canWithdraw
+                                ? "Unstaked funds ready to withdraw."
+                                : "Unstaked funds not yet withdrawable (~4 epochs)."
+                            }
+                          />
+                          <Button
+                            onClick={() => {
+                              setBusy(true);
+                              selector
+                                .wallet()
+                                .then(async (wallet) => {
+                                  await wallet.signAndSendTransactions({
+                                    transactions: [
+                                      {
+                                        receiverId: fullPoolId,
+                                        signerId: accountId ?? undefined,
+                                        actions: [
+                                          actionCreators.functionCall(
+                                            "withdraw_all",
+                                            {},
+                                            BigInt("100000000000000"),
+                                            BigInt("0"),
+                                          ),
+                                        ],
+                                      },
+                                    ],
+                                  });
+                                })
+                                .catch(console.error)
+                                .then(() => refetchAccountStakingBalance())
+                                .finally(() => setBusy(false));
+                            }}
+                            disabled={
+                              busy || !accountStakingBalance.canWithdraw
+                            }
+                          >
+                            Withdraw
+                          </Button>
+                        </RowDiv>
+                      )}
                   </>
                 ) : (
                   <>
